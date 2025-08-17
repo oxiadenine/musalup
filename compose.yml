@@ -1,0 +1,41 @@
+services:
+  musalup-web:
+    container_name: musalup-web
+    image: musalup-web
+    build:
+      context: .
+      args:
+        ugid: ${UGID}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.musalupweb.rule=Host(`${HOST}`) || Host(`www.${HOST}`)
+      - traefik.http.routers.musalupweb.entrypoints=websecure
+      - traefik.http.routers.musalupweb.tls=true
+      - traefik.http.routers.musalupweb.middlewares=wwwredirect
+      - traefik.http.middlewares.wwwredirect.redirectregex.regex=^https?://www\.${HOST}/?(.*)$
+      - traefik.http.middlewares.wwwredirect.redirectregex.replacement=https://${HOST}/$${1}
+      - traefik.http.middlewares.wwwredirect.redirectregex.permanent=true
+    volumes:
+      - ./data:/home/musalup/data
+    networks:
+      - musalup-network
+  musalup-proxy:
+    container_name: musalup-proxy
+    image: traefik:v3.5.0
+    ports:
+      - 80:80
+      - 443:443
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - musalup-network
+networks:
+  musalup-network:
+    name: musalup-network
