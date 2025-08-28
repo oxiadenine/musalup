@@ -10,6 +10,7 @@ RUN if [ $UGID != 0 ] && [ $UGID != 1000 ]; then adduser -u $UGID -D musalup -G 
 WORKDIR /home/musalup
 
 COPY dist .
+COPY .env .env
 COPY public public
 
 RUN chown -R $UGID:$UGID /home/musalup
