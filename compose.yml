@@ -19,6 +19,20 @@ services:
       - ./data:/home/musalup/data
     networks:
       - musalup-network
+    depends_on:
+      - musalup-db
+  musalup-db:
+    image: postgres:18beta3-alpine3.22
+    container_name: musalup-db
+    env_file: ./data/db/.env
+    ports:
+      - 5432:5432
+    volumes:
+      - /etc/passwd:/etc/passwd:ro
+      - ./data/db/files:/var/lib/postgresql/18/docker
+    user: ${UGID}:${UGID}
+    networks:
+      - musalup-network
   musalup-proxy:
     container_name: musalup-proxy
     image: traefik:v3.5.0

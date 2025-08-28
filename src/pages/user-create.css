@@ -1,0 +1,28 @@
+.user-create {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  row-gap: 16px;
+}
+
+.user-create h1 {
+  text-align: center;
+}
+
+.user-create form {
+  display: flex;
+  flex-direction: column;
+  row-gap: 8px;
+}
+
+.user-create form input, button {
+  padding: 4px;
+}
+
+.user-create form button {
+  margin-top: 8px;
+  text-align: center;
+  cursor: pointer;
+}
