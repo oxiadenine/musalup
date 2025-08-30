@@ -1,81 +1,86 @@
-import { User } from "../data/user";
-import { UserSessionCookie } from "../lib/user-session-cookie";
+import { User, UserError } from "./user";
+import { UserSessionError } from "./user-session";
+import { UserSessionCookie, UserSessionCookieError } from "./user-session-cookie";
 
 export const userRoutes = {
   "/api/users/create": {
-    POST: async request => {
-      const { nickname, password } = await request.json();
+    POST: async request => handleRoute(async () => {
+      let user = await request.json();
 
-      if (!nickname) {
-        return new Response("Nickname is empty", { status: 400 });
-      }
-
-      if (!password) {
-        return new Response("Password is empty", { status: 400 });
-      }
-
-      let user = await User.read({ nickname });
-
-      if (user) {
-        return new Response(`User ${user.nickname} already exists`, { status: 403 });
-      }
-
-      user = await User.create({ nickname, password });
+      user = await User.create(user);
 
       return Response.json({ user }, { status: 201 });
-    }
+    })
   },
   "/api/users/auth": {
-    POST: async request => {
-      const { nickname, password } = await request.json();
+    POST: async request => handleRoute(async () => {
+      let user = await request.json();
 
-      if (!nickname) {
-        return new Response("Nickname is empty", { status: 400 });
-      }
+      user = await User.verify(user);
 
-      if (!password) {
-        return new Response("Password is empty", { status: 400 });
-      }
+      await UserSessionCookie.create(user, request.cookies);
 
-      const user = await User.read({ nickname });
+      delete user.password;
 
-      if (!user) {
-        return new Response(`User ${nickname} does not exists`, { status: 403 });
-      }
-
-      try {
-        await User.verify({ plainPassword: password, password: user.password });
-      } catch (error) {
-        return new Response(error.message, { status: 401 });
-      }
-
-      return await UserSessionCookie.create(user, request.cookies);
-    }
+      return Response.json({ user });
+    })
   },
   "/api/users/:userId/auth/revoke": {
-    POST: async request => {
-      const { userId } = request.params;
-    
-      const user = await User.read({ id: userId });
+    POST: async request => handleRoute(async () => {
+      let user = { id: request.params.userId };
 
-      if (!user) {
-        return new Response(`User ${userId} does not exists`, { status: 403 });
-      }
+      user = await User.read(user);
 
-      return await UserSessionCookie.revoke(user, request.cookies);
-    }
+      await UserSessionCookie.revoke(user, request.cookies);
+
+      delete user.password;
+
+      return Response.json({ user });
+    })
   },
   "/api/users/:userId": {
-    GET: async request => {
-      const { userId } = request.params;
-    
-      const user = await User.read({ id: userId });
+    GET: async request => handleRoute(async () => {
+      let user = { id: request.params.userId };
 
-      if (!user) {
-        return new Response(`User ${userId} does not exists`, { status: 403 });
-      }
+      user = await User.read(user);
 
-      return await UserSessionCookie.verify(user, request.cookies);
-    }
+      await UserSessionCookie.verify(user, request.cookies);
+
+      delete user.password;
+
+      return Response.json({ user });
+    })
   }
 };
+
+async function handleRoute(block) {
+  try {
+    return await block();
+  } catch (error) {
+    if (error instanceof UserError) {
+      if (error.cause.code === UserError.Code.empty) {
+        return new Response(error.message, { status: 400 });
+      } else if (error.cause.code === UserError.Code.validity) {
+        return new Response(error.message, { status: 401 });
+      } else if (error.cause.code === UserError.Code.duplicate) {
+        return new Response(error.message, { status: 409 });
+      } else if (error.cause.code === UserError.Code.none) {
+        return new Response(error.message, { status: 403 });
+      }
+    } else if (error instanceof UserSessionError) {
+      if (error.cause.code === UserSessionError.Code.none) {
+        return new Response(error.message, { status: 403 });
+      } else if (error.cause.code === UserSessionError.Code.validity) {
+        return new Response(error.message, { status: 401 });
+      }
+    } else if (error instanceof UserSessionCookieError) {
+      if (error.cause.code === UserSessionCookieError.Code.missing) {
+        return new Response(error.message, { status: 403 });
+      } else if (error.cause.code === UserSessionCookieError.Code.expiration) {
+        return new Response(error.message, { status: 401 });
+      }
+    }
+
+    return new Response("Internal server error", { status: 500 });
+  }
+}
