@@ -17,6 +17,8 @@ export const userRoutes = {
             return new Response(error.message, { status: 409 });
           }
         }
+
+        throw error;
       }
 
       return Response.json({ user }, { status: 201 });
@@ -40,6 +42,8 @@ export const userRoutes = {
             return new Response(error.message, { status: 401 });
           }
         }
+
+        throw error;
       }
 
       delete user.password;
@@ -71,6 +75,8 @@ export const userRoutes = {
             return new Response(error.message, { status: 403 });
           }
         }
+
+        throw error;
       }
 
       delete user.password;
@@ -104,6 +110,8 @@ export const userRoutes = {
             return new Response(error.message, { status: 401 });
           }
         }
+
+        throw error;
       }
 
       delete user.password;
