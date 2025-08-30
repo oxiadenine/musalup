@@ -51,7 +51,9 @@ export class UserSession {
         decipher.final()
       ]);
     } catch (error) {
-      throw Error(`Invalid session ${session.id}`);
+      throw new UserSessionError("User session is not valid", {
+        cause: { code: UserSessionError.Code.validity }
+      });
     }
   }
 
@@ -60,6 +62,12 @@ export class UserSession {
       SELECT id, time, expires_at AS "expiresAt", iv, auth_tag AS "authTag" FROM user_sessions 
       WHERE user_id = ${user.id} AND id = ${session.id}
     `;
+
+    if (!result[0]) {
+      throw new UserSessionError("User session does not exists", {
+        cause: { code: UserSessionError.Code.undefined }
+      });
+    }
 
     return result[0];
   }
@@ -74,4 +82,15 @@ export class UserSession {
       await Database.client`DELETE FROM user_sessions WHERE user_id = ${user.id}`;
     }
   }
+}
+
+export class UserSessionError extends Error {
+  constructor(message, options) {
+    super(message, options);
+  }
+
+  static Code = Object.freeze({
+    none: 0,
+    validity: 1
+  });
 }
