@@ -53,7 +53,7 @@ export class User {
 
     if (!result[0]) {
       throw new UserError("User does not exists", {
-        cause: { code: UserError.Code.undefined }
+        cause: { code: UserError.Code.none }
       });
     }
 
@@ -76,7 +76,7 @@ export class User {
 
     if (!result[0]) {
       throw new UserError("User does not exists", {
-        cause: { code: UserError.Code.undefined }
+        cause: { code: UserError.Code.none }
       });
     }
 

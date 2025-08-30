@@ -65,7 +65,7 @@ export class UserSession {
 
     if (!result[0]) {
       throw new UserSessionError("User session does not exists", {
-        cause: { code: UserSessionError.Code.undefined }
+        cause: { code: UserSessionError.Code.none }
       });
     }
 
