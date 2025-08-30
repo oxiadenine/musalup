@@ -42,7 +42,7 @@ export class UserSessionCookie {
       cookies.delete({ name: SESSION_COOKIE_NAME, path: SESSION_COOKIE_PATH });
 
       throw new UserSessionCookieError((`Cookie ${SESSION_COOKIE_NAME} has expired`), {
-        cause: { code: UserSessionError.Code.expiration }
+        cause: { code: UserSessionCookieError.Code.expiration }
       });
     }
 
