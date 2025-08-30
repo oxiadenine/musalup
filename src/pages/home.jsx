@@ -27,14 +27,14 @@ export function Home() {
       </Helmet>
       <h1>{process.env.PUBLIC_SITE_NAME}</h1>
       <div>
-        <button type="button">
-          <Link to={"/users/create"}>Registrarse</Link>
-        </button>
+        <Link to={"/users/create"}>
+          <button type="button">Registrarse</button>
+        </Link>
         {user && <button type="button" onClick={revokeUserAuth}>Cerrar sesión</button>}
         {!user && (
-          <button type="button">
-            <Link to={"/users/auth"}>Iniciar sesión</Link>
-          </button>
+          <Link to={"/users/auth"}>
+            <button type="button">Iniciar sesión</button>
+          </Link>
         )}
       </div>
     </div>
