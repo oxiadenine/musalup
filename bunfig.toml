@@ -1,2 +1,9 @@
 [serve.static]
 env = "PUBLIC_*"
+
+[install]
+cache = true
+
+[test]
+preload = ["./src/__tests__/setup.js"]
+timeout = 10000

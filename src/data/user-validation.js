@@ -20,25 +20,25 @@ export class UserValidation {
 
     const nickname = user.nickname;
 
-    if (!nickname) {
+    if (!nickname || nickname.trim() === '') {
       validation.errors.nickname.push({ type: "empty", message: messages.nickname.empty });
     }
-    if (nickname.length < 3 || nickname.length > 16) {
+    if (nickname && nickname.trim() !== '' && (nickname.length < 3 || nickname.length > 16)) {
       validation.errors.nickname.push({ type: "length", message: messages.nickname.length });
     }
-    if (!/^[a-z0-9]+$/i.test(nickname)) {
+    if (nickname && nickname.trim() !== '' && nickname.length >= 3 && nickname.length <= 16 && !/^[a-zA-Z0-9_-]+$/.test(nickname)) {
       validation.errors.nickname.push({ type: "format", message: messages.nickname.format });
     }
 
     const password = user.password;
 
-    if (!password) {
+    if (!password || password.trim() === '') {
       validation.errors.password.push({ type: "empty", message: messages.password.empty });
     }
-    if (password.length < 12 || password.length > 32) {
+    if (password && password.trim() !== '' && (password.length < 12 || password.length > 32)) {
       validation.errors.password.push({ type: "length", message: messages.password.length });
     }
-    if (!/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).+$/.test(password)) {
+    if (password && password.trim() !== '' && password.length >= 12 && password.length <= 32 && !/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).+$/.test(password)) {
       validation.errors.password.push({ type: "format", message: messages.password.format });
     }
 
