@@ -18,27 +18,27 @@ export class UserValidation {
   static validate(user, messages) {
     const validation = new UserValidation();
 
-    const nickname = user.nickname;
+    const nickname = user.nickname?.trim() ?? "";
 
-    if (!nickname || nickname.trim() === '') {
+    if (nickname === "") {
       validation.errors.nickname.push({ type: "empty", message: messages.nickname.empty });
     }
-    if (nickname && nickname.trim() !== '' && (nickname.length < 3 || nickname.length > 16)) {
+    if (nickname.length < 3 || nickname.length > 16) {
       validation.errors.nickname.push({ type: "length", message: messages.nickname.length });
     }
-    if (nickname && nickname.trim() !== '' && nickname.length >= 3 && nickname.length <= 16 && !/^[a-zA-Z0-9_-]+$/.test(nickname)) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(nickname)) {
       validation.errors.nickname.push({ type: "format", message: messages.nickname.format });
     }
 
-    const password = user.password;
+    const password = user.password?.trim() ?? "";
 
-    if (!password || password.trim() === '') {
+    if (password === "") {
       validation.errors.password.push({ type: "empty", message: messages.password.empty });
     }
-    if (password && password.trim() !== '' && (password.length < 12 || password.length > 32)) {
+    if (password.length < 12 || password.length > 32) {
       validation.errors.password.push({ type: "length", message: messages.password.length });
     }
-    if (password && password.trim() !== '' && password.length >= 12 && password.length <= 32 && !/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).+$/.test(password)) {
+    if (!/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).+$/.test(password)) {
       validation.errors.password.push({ type: "format", message: messages.password.format });
     }
 
