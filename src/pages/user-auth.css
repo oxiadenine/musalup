@@ -26,3 +26,8 @@
   text-align: center;
   cursor: pointer;
 }
+
+.user-auth form p {
+  font-size: 0.75rem;
+  color: red;
+}
