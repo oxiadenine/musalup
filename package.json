@@ -11,7 +11,9 @@
   "scripts": {
     "dev": "NODE_ENV=development bun --hot ./src/index.js --env='PUBLIC_*'",
     "build": "bun build --production ./src/index.js --outdir=./dist --target=bun --public-path / --sourcemap --minify --env='PUBLIC_*'",
-    "start": "NODE_ENV=production bun ./src/index.js --env='PUBLIC_*'"
+    "start": "NODE_ENV=production bun ./src/index.js --env='PUBLIC_*'",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "type": "module",
   "dependencies": {

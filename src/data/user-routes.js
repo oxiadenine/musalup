@@ -1,4 +1,5 @@
-import { User, UserError } from "./user";
+import { User } from "./user";
+import { UserError } from "./user-error";
 import { UserSessionError } from "./user-session";
 import { UserSessionCookie, UserSessionCookieError } from "./user-session-cookie";
 
@@ -58,9 +59,9 @@ async function handleRoute(block) {
     return await block();
   } catch (error) {
     if (error instanceof UserError) {
-      if (error.cause.code === UserError.Code.empty) {
-        return new Response(error.message, { status: 400 });
-      } else if (error.cause.code === UserError.Code.validity) {
+      if (error.cause.code === UserError.Code.validity) {
+        return Response.json({ error: error.message, cause: error.cause }, { status: 400 });
+      } else if (error.cause.code === UserError.Code.verification) {
         return new Response(error.message, { status: 401 });
       } else if (error.cause.code === UserError.Code.duplicate) {
         return new Response(error.message, { status: 409 });

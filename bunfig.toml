@@ -1,2 +1,6 @@
 [serve.static]
 env = "PUBLIC_*"
+
+[test]
+root = "./src/__tests__"
+timeout = 10000
