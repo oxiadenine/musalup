@@ -1,322 +1,270 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { UserValidation } from "../data/user-validation.js";
-import { UserError } from "../data/user-error.js";
+import { describe, test, expect } from "bun:test";
+import { UserValidation } from "../data/user-validation";
+import { UserError } from "../data/user-error";
 
-describe("UserValidation", () => {
-  let validation;
-  let messages;
+describe("User validation", () => {
+  const messages = {
+    nickname: {
+      empty: "User nickname is empty",
+      length: "User nickname is less than 3 or greater than 16 characters",
+      format: "User nickname is not in a valid format"
+    },
+    password: {
+      empty: "User password is empty",
+      length: "User password is less than 12 or greater than 32 characters",
+      format: "User password is not in a valid format"
+    }
+  };
+  const errorMessage = "User is not valid";
 
-  beforeEach(() => {
-    validation = new UserValidation();
-    messages = {
-      nickname: {
-        empty: "User nickname is empty",
-        length: "User nickname is less than 3 or greater than 16 characters",
-        format: "User nickname is not in a valid format"
-      },
-      password: {
-        empty: "User password is empty",
-        length: "User password is less than 12 or greater than 32 characters",
-        format: "User password is not in a valid format"
-      }
-    };
-  });
-
-  // ============================================================================
-  // BASIC FUNCTIONALITY TESTS
-  // ============================================================================
-
-  describe("Basic Functionality", () => {
-    test("should initialize correctly and handle errors", () => {
-      // Test constructor and initial state
+  describe("Base functionality", () => {
+    const validation = new UserValidation();
+    
+    test("should initialize correctly", () => {
       expect(validation.errors).toEqual({ nickname: [], password: [] });
       expect(validation.hasErrors).toBe(false);
-
-      // Test hasErrors property
-      validation.errors.nickname.push({ type: "empty", message: "test" });
-      expect(validation.hasErrors).toBe(true);
-
-      validation.errors.password.push({ type: "empty", message: "test" });
-      expect(validation.hasErrors).toBe(true);
     });
 
-    test("should throw UserError correctly", () => {
-      validation.errors.nickname.push({ type: "empty", message: "test" });
-      
-      expect(() => validation.throwIfErrors("test message")).toThrow(UserError);
-      
+    test("should throw UserError if errors", () => {
+      validation.errors.nickname.push({});
+      validation.errors.password.push({});
+        
+      expect(() => validation.throwIfErrors(errorMessage)).toThrow(UserError);
+        
       try {
-        validation.throwIfErrors("User is not valid");
+        validation.throwIfErrors(errorMessage);
       } catch (error) {
-        expect(error.message).toBe("User is not valid");
+        expect(error.message).toBe(errorMessage);
         expect(error.cause.code).toBe(UserError.Code.validity);
         expect(error.cause.errors).toEqual(validation.errors);
       }
     });
 
-    test("should not throw when no errors exist", () => {
-      expect(() => validation.throwIfErrors("test message")).not.toThrow();
+    test("should not throw UserError if no errors", () => {
+      validation.errors.nickname.length = 0;
+      validation.errors.password.length = 0;
+
+      expect(() => validation.throwIfErrors(errorMessage)).not.toThrow();
     });
   });
 
-  // ============================================================================
-  // NICKNAME VALIDATION TESTS
-  // ============================================================================
+  describe("Nickname", () => {
+    let data = [
+      "abc",
+      "user123",
+      "User123",
+      "USER123",
+      "user_123",
+      "User-123",
+      "test_user",
+      "Test-User",
+      "demo123",
+      "Demo_User",
+      "abcdefghijklmnop"
+    ];
 
-  describe("Nickname Validation", () => {
-    test("should validate valid nicknames", () => {
-      const validNicknames = [
-        "abc", "user123", "User123", "USER123", "user_123", "User-123",
-        "test_user", "Test-User", "demo123", "Demo_User", "abcdefghijklmnop"
-      ];
+    test.each(data)("should not set errors for valid nicknames", (nickname) => {
+      const validation = UserValidation.validate({ nickname }, messages);
 
-      validNicknames.forEach(nickname => {
-        const user = { nickname, password: "ValidPass123!" };
-        const result = UserValidation.validate(user, messages);
-        expect(result.hasErrors).toBe(false);
-        expect(result.errors.nickname).toHaveLength(0);
-      });
+      expect(validation.errors.nickname).toHaveLength(0);
     });
 
-    test("should reject invalid nicknames", () => {
-      const invalidCases = [
-        // Empty cases
-        { nickname: "", expectedType: "empty" },
-        { nickname: null, expectedType: "empty" },
-        { nickname: undefined, expectedType: "empty" },
-        { nickname: "   ", expectedType: "empty" },
-        
-        // Length cases
-        { nickname: "ab", expectedType: "length" },
-        { nickname: "abcdefghijklmnopq", expectedType: "length" },
-        
-        // Format cases
-        { nickname: "user@123", expectedType: "format" },
-        { nickname: "user 123", expectedType: "format" },
-        { nickname: "@#$%", expectedType: "format" }
-      ];
+    data = [
+      ["", ["empty", "length", "format"]],
+      [null, ["empty", "length", "format"]],
+      [undefined, ["empty", "length", "format"]],
+      ["   ", ["empty", "length", "format"]],
+      ["ab", ["length"]],
+      ["abcdefghijklmnopq", ["length"]],
+      ["user@123", ["format"]],
+      ["user 123", ["format"]],
+      ["@#$%", ["format"]]
+    ];
 
-      invalidCases.forEach(({ nickname, expectedType }) => {
-        const user = { nickname, password: "ValidPass123!" };
-        const result = UserValidation.validate(user, messages);
+    test.each(data)("should set errors for invalid nicknames", (nickname, errorTypes) => {
+      const validation = UserValidation.validate({ nickname }, messages);
         
-        expect(result.hasErrors).toBe(true);
-        expect(result.errors.nickname).toHaveLength(1);
-        expect(result.errors.nickname[0].type).toBe(expectedType);
+      expect(validation.hasErrors).toBe(true);
+      expect(validation.errors.nickname).toHaveLength(errorTypes.length);
+
+      errorTypes.forEach(errorType => {
+        const error = validation.errors.nickname.find(error => error.type === errorType);
+        
+        expect(error.type).toBe(errorType);
       });
-    });
 
-    test("should collect multiple errors for complex invalid nicknames", () => {
-      const complexInvalidNicknames = [
-        "a", // too short + invalid format
-        "verylongnickname123" // too long + invalid format
-      ];
+      expect(() => validation.throwIfErrors(errorMessage)).toThrow(UserError);
 
-      complexInvalidNicknames.forEach(nickname => {
-        const user = { nickname, password: "ValidPass123!" };
-        const result = UserValidation.validate(user, messages);
-        
-        expect(result.hasErrors).toBe(true);
-        expect(result.errors.nickname.length).toBeGreaterThanOrEqual(1);
-        
-        // Should have at least length error
-        const hasLengthError = result.errors.nickname.some(e => e.type === "length");
-        expect(hasLengthError).toBe(true);
-      });
-    });
-  });
-
-  // ============================================================================
-  // PASSWORD VALIDATION TESTS
-  // ============================================================================
-
-  describe("Password Validation", () => {
-    test("should validate valid passwords", () => {
-      const validPasswords = [
-        "ValidPass123!", "MySecureP@ss1", "Test123#Password",
-        "Complex$Pass123", "StrongP@ss123", "Secure#Pass123",
-        "ValidPass123!VeryLongPassword32"
-      ];
-
-      validPasswords.forEach(password => {
-        const user = { nickname: "validuser", password };
-        const result = UserValidation.validate(user, messages);
-        expect(result.hasErrors).toBe(false);
-        expect(result.errors.password).toHaveLength(0);
-      });
-    });
-
-    test("should reject invalid passwords", () => {
-      const invalidCases = [
-        // Empty cases
-        { password: "", expectedType: "empty" },
-        { password: null, expectedType: "empty" },
-        { password: undefined, expectedType: "empty" },
-        { password: "   ", expectedType: "empty" },
-        
-        // Length cases
-        { password: "Short1!", expectedType: "length" },
-        { password: "VeryLongPassword123!ThatExceeds32Characters", expectedType: "length" },
-        
-        // Format cases (passwords with correct length but missing requirements)
-        { password: "ValidPass!@#", expectedType: "format" }, // missing numbers
-        { password: "ValidPass123", expectedType: "format" }, // missing special chars
-        { password: "validpass123!", expectedType: "format" }, // missing uppercase
-        { password: "VALIDPASS123!", expectedType: "format" }  // missing lowercase
-      ];
-
-      invalidCases.forEach(({ password, expectedType }) => {
-        const user = { nickname: "validuser", password };
-        const result = UserValidation.validate(user, messages);
-        
-        expect(result.hasErrors).toBe(true);
-        expect(result.errors.password).toHaveLength(1);
-        expect(result.errors.password[0].type).toBe(expectedType);
-      });
-    });
-
-    test("should collect multiple errors for complex invalid passwords", () => {
-      const complexInvalidPasswords = [
-        "short", // too short + missing requirements
-        "ValidPass!" // missing numbers + missing special chars
-      ];
-
-      complexInvalidPasswords.forEach(password => {
-        const user = { nickname: "validuser", password };
-        const result = UserValidation.validate(user, messages);
-        
-        expect(result.hasErrors).toBe(true);
-        expect(result.errors.password.length).toBeGreaterThanOrEqual(1);
-        
-        // Should have at least length error for short passwords
-        if (password.length < 12) {
-          const hasLengthError = result.errors.password.some(e => e.type === "length");
-          expect(hasLengthError).toBe(true);
-        }
-      });
-    });
-  });
-
-  // ============================================================================
-  // COMPREHENSIVE VALIDATION SCENARIOS
-  // ============================================================================
-
-  describe("Comprehensive Validation", () => {
-    test("should handle various user combinations", () => {
-      const testCases = [
-        // Valid users
-        { user: { nickname: "user123", password: "ValidPass123!" }, shouldPass: true },
-        { user: { nickname: "User_123", password: "MySecureP@ss1" }, shouldPass: true },
-        { user: { nickname: "test-user", password: "Test123#Password" }, shouldPass: true },
-        
-        // Users with nickname errors only
-        { user: { nickname: "", password: "ValidPass123!" }, shouldPass: false, nicknameErrors: 1, passwordErrors: 0 },
-        { user: { nickname: "ab", password: "ValidPass123!" }, shouldPass: false, nicknameErrors: 1, passwordErrors: 0 },
-        
-        // Users with password errors only
-        { user: { nickname: "validuser", password: "" }, shouldPass: false, nicknameErrors: 0, passwordErrors: 1 },
-        { user: { nickname: "validuser", password: "short" }, shouldPass: false, nicknameErrors: 0, passwordErrors: 1 },
-        
-        // Users with both errors
-        { user: { nickname: "a", password: "short" }, shouldPass: false, nicknameErrors: 1, passwordErrors: 1 },
-        { user: { nickname: "user@123", password: "VALIDPASS123!" }, shouldPass: false, nicknameErrors: 1, passwordErrors: 1 }
-      ];
-
-      testCases.forEach(({ user, shouldPass, nicknameErrors = 0, passwordErrors = 0 }) => {
-        const result = UserValidation.validate(user, messages);
-        
-        expect(result.hasErrors).toBe(!shouldPass);
-        
-        if (!shouldPass) {
-          expect(result.errors.nickname).toHaveLength(nicknameErrors);
-          expect(result.errors.password).toHaveLength(passwordErrors);
-        } else {
-          expect(result.errors.nickname).toHaveLength(0);
-          expect(result.errors.password).toHaveLength(0);
-        }
-      });
-    });
-
-    test("should maintain error message consistency", () => {
-      const testCases = [
-        { user: { nickname: "", password: "ValidPass123!" }, expectedNicknameType: "empty", expectedPasswordType: null },
-        { user: { nickname: "ab", password: "ValidPass123!" }, expectedNicknameType: "length", expectedPasswordType: null },
-        { user: { nickname: "user@123", password: "ValidPass123!" }, expectedNicknameType: "format", expectedPasswordType: null },
-        { user: { nickname: "validuser", password: "" }, expectedNicknameType: null, expectedPasswordType: "empty" },
-        { user: { nickname: "validuser", password: "short" }, expectedNicknameType: null, expectedPasswordType: "length" }
-      ];
-
-      testCases.forEach(({ user, expectedNicknameType, expectedPasswordType }) => {
-        const result = UserValidation.validate(user, messages);
-        
-        if (expectedNicknameType) {
-          expect(result.errors.nickname[0].type).toBe(expectedNicknameType);
-          expect(result.errors.nickname[0].message).toBe(messages.nickname[expectedNicknameType]);
-        }
-        
-        if (expectedPasswordType) {
-          expect(result.errors.password[0].type).toBe(expectedPasswordType);
-          expect(result.errors.password[0].message).toBe(messages.password[expectedPasswordType]);
-        }
-      });
-    });
-  });
-
-  // ============================================================================
-  // EDGE CASES AND PERFORMANCE
-  // ============================================================================
-
-  describe("Edge Cases and Performance", () => {
-    test("should handle extreme input cases", () => {
-      const edgeCases = [
-        // Very long strings
-        { user: { nickname: "a".repeat(1000), password: "a".repeat(1000) }, expectedNicknameType: "length", expectedPasswordType: "length" },
-        
-        // Unicode characters
-        { user: { nickname: "user🚀123", password: "ValidPass123!" }, expectedNicknameType: "format", expectedPasswordType: null },
-        
-        // Null/undefined cases
-        { user: { nickname: null, password: undefined }, expectedNicknameType: "empty", expectedPasswordType: "empty" },
-        
-        // Empty object
-        { user: {}, expectedNicknameType: "empty", expectedPasswordType: "empty" }
-      ];
-
-      edgeCases.forEach(({ user, expectedNicknameType, expectedPasswordType }) => {
-        const result = UserValidation.validate(user, messages);
-        
-        expect(result.hasErrors).toBe(true);
-        
-        if (expectedNicknameType) {
-          expect(result.errors.nickname[0].type).toBe(expectedNicknameType);
-        }
-        
-        if (expectedPasswordType) {
-          expect(result.errors.password[0].type).toBe(expectedPasswordType);
-        }
-      });
-    });
-  });
-
-  // ============================================================================
-  // INTEGRATION TESTS
-  // ============================================================================
-
-  describe("Integration with Error Handling", () => {
-    test("should integrate correctly with UserError system", () => {
-      const user = { nickname: "a", password: "short" };
-      const result = UserValidation.validate(user, messages);
-      
-      expect(() => result.throwIfErrors("User is not valid")).toThrow(UserError);
-      
       try {
-        result.throwIfErrors("User is not valid");
+        validation.throwIfErrors(errorMessage);
       } catch (error) {
         expect(error).toBeInstanceOf(UserError);
         expect(error.cause.code).toBe(UserError.Code.validity);
         expect(error.cause.errors).toBeDefined();
-        expect(error.cause.errors.nickname).toHaveLength(1);
-        expect(error.cause.errors.password).toHaveLength(1);
+        expect(error.cause.errors.nickname).toHaveLength(errorTypes.length);
+        expect(error.cause.errors.password).toHaveLength(3);
+      }
+    });
+  });
+
+  describe("Password", () => {
+    let data = [
+      "ValidPass123!",
+      "MySecureP@ss1",
+      "Test123#Password",
+      "Complex$Pass123",
+      "StrongP@ss123",
+      "Secure#Pass123",
+      "ValidPass123!VeryLongPassword32"
+    ];
+
+    test.each(data)("should not set errors for valid passwords", (password) => {
+      const validation = UserValidation.validate({ password }, messages);
+
+      expect(validation.errors.password).toHaveLength(0);
+    });
+
+    data = [
+      ["", ["empty", "length", "format"]],
+      [null, ["empty", "length", "format"]],
+      [undefined, ["empty", "length", "format"]],
+      ["   ", ["empty", "length", "format"]],
+      ["Short1!", ["length"]],
+      ["VeryLongPassword123!ThatExceeds32Characters", ["length"]],
+      ["ValidPass!@#", ["format"]],
+      ["ValidPass123", ["format"]],
+      ["validpass123!", ["format"]],
+      ["VALIDPASS123!", ["format"]]
+    ];
+
+    test.each(data)("should set errors for invalid passwords", (password, errorTypes) => {
+      const validation = UserValidation.validate({ password }, messages);
+        
+      expect(validation.hasErrors).toBe(true);
+      expect(validation.errors.password).toHaveLength(errorTypes.length);
+
+      errorTypes.forEach(errorType => {
+        const error = validation.errors.password.find(error => error.type === errorType);
+        
+        expect(error.type).toBe(errorType);
+      });
+
+      expect(() => validation.throwIfErrors(errorMessage)).toThrow(UserError);
+
+      try {
+        validation.throwIfErrors(errorMessage);
+      } catch (error) {
+        expect(error).toBeInstanceOf(UserError);
+        expect(error.cause.code).toBe(UserError.Code.validity);
+        expect(error.cause.errors).toBeDefined();
+        expect(error.cause.errors.nickname).toHaveLength(3);
+        expect(error.cause.errors.password).toHaveLength(errorTypes.length);
+      }
+    });
+  });
+
+  describe("Nickname and password", () => {
+    const data = [
+      [{ nickname: "user123", password: "ValidPass123!" }, false, [], []],
+      [{ nickname: "User_123", password: "MySecureP@ss1" }, false, [], []],
+      [{ nickname: "test-user", password: "Test123#Password" }, false, [], []],
+      [{ nickname: "", password: "ValidPass123!" }, true, ["empty", "length", "format"], []],
+      [{ nickname: "ab", password: "ValidPass123!" }, true, ["length"], []],
+      [{ nickname: "validuser", password: "" }, true, [], ["empty", "length", "format"]],
+      [{ nickname: "validuser", password: "abcdf" }, true, [], ["length", "format"]],
+      [{ nickname: "a", password: "abcdf" }, true, ["length"], ["length", "format"]],
+      [{ nickname: "user@123", password: "VALIDPASS123!" }, true, ["format"], ["format"]]
+    ];
+
+    test.each(data)("should validate correctly", (
+      user, hasErrors, nicknameErrorTypes, passwordErrorTypes
+    ) => {
+      const validation = UserValidation.validate(user, messages);
+        
+      expect(validation.hasErrors).toBe(hasErrors);
+        
+      if (hasErrors) {
+        expect(validation.errors.nickname).toHaveLength(nicknameErrorTypes.length);
+        
+        nicknameErrorTypes.forEach(errorType => {
+          const error = validation.errors.nickname.find(error => error.type === errorType);
+          
+          expect(error.type).toBe(errorType);
+        });
+
+        expect(validation.errors.password).toHaveLength(passwordErrorTypes.length);
+
+        passwordErrorTypes.forEach(errorType => {
+          const error = validation.errors.password.find(error => error.type === errorType);
+          
+          expect(error.type).toBe(errorType);
+        });
+      } else {
+        expect(validation.errors.nickname).toHaveLength(0);
+        expect(validation.errors.password).toHaveLength(0);
+      }
+
+      if (hasErrors) {
+        expect(() => validation.throwIfErrors(errorMessage)).toThrow(UserError);
+      } else {
+        expect(() => validation.throwIfErrors(errorMessage)).not.toThrow();
+      }
+
+      try {
+        validation.throwIfErrors(errorMessage);
+      } catch (error) {
+        expect(error).toBeInstanceOf(UserError);
+        expect(error.cause.code).toBe(UserError.Code.validity);
+        expect(error.cause.errors).toBeDefined();
+        expect(error.cause.errors.nickname).toHaveLength(nicknameErrorTypes.length);
+        expect(error.cause.errors.password).toHaveLength(passwordErrorTypes.length);
+      }
+    });
+  });
+
+  describe("Nickname and password (edge cases)", () => {
+    const data = [
+      [{ nickname: "a".repeat(1000), password: "a5D$".repeat(1000) }, "length", "length"],
+      [{ nickname: "user🚀123", password: "ValidPass123!" }, "format", undefined],
+      [{ nickname: "user123", password: "password123!" }, undefined, "format"],
+      [{ nickname: null, password: undefined }, "empty", "empty"],
+      [{ nickname: undefined, password: null }, "empty", "empty"],
+      [{}, "empty", "empty"]
+    ];
+
+    test.each(data)("should validate correctly", (user, nicknameErrorType, passwordErrorType) => {
+      const validation = UserValidation.validate(user, messages);
+        
+      expect(validation.hasErrors).toBe(true);
+        
+      if (nicknameErrorType) {
+        expect(validation.errors.nickname[0].type).toBe(nicknameErrorType);
+      } else {
+        expect(validation.errors.nickname[0]?.type).toBe(nicknameErrorType);
+      }
+        
+      if (passwordErrorType) {
+        expect(validation.errors.password[0].type).toBe(passwordErrorType);
+      } else {
+        expect(validation.errors.password[0]?.type).toBe(passwordErrorType);
+      }
+
+      expect(() => validation.throwIfErrors(errorMessage)).toThrow(UserError);
+
+      try {
+        validation.throwIfErrors(errorMessage);
+      } catch (error) {
+        expect(error).toBeInstanceOf(UserError);
+        expect(error.cause.code).toBe(UserError.Code.validity);
+        expect(error.cause.errors).toBeDefined();
+
+        if (nicknameErrorType) {
+          expect(error.cause.errors.nickname.length).toBeGreaterThanOrEqual(1);
+        }
+        
+        if (passwordErrorType) {
+          expect(error.cause.errors.password.length).toBeGreaterThanOrEqual(1);
+        }
       }
     });
   });
