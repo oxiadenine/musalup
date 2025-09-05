@@ -11,7 +11,7 @@ export class User {
     let result = await Database.client`SELECT EXISTS (SELECT 1 FROM users WHERE nickname = ${user.nickname})`;
 
     if (result[0].exists) {
-      throw new UserError("User already exists", {
+      throw new UserError("User nickname already exist", {
         cause: { code: UserError.Code.duplicate }
       });
     }
@@ -34,7 +34,7 @@ export class User {
     let result = await Database.client`SELECT * FROM users WHERE nickname = ${user.nickname}`;
 
     if (!result[0]) {
-      throw new UserError("User does not exists", {
+      throw new UserError("User nickname does not exist", {
         cause: { code: UserError.Code.none }
       });
     }

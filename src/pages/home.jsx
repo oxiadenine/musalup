@@ -1,10 +1,31 @@
 import { useState } from "react";
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData, Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
+import { Intl, useTranslation } from "../lib/intl";
 import "./home.css";
 
+const messages = {
+  es: {
+    button: {
+      create: "Registrarse",
+      auth: "Iniciar sesión",
+      revoke: "Cerrar sesión"
+    }
+  },
+  en: {
+    button: {
+      create: "Sign up",
+      auth: "Sign in",
+      revoke: "Sign out"
+    }
+  }
+};
 
 export function Home() {
+  const [translate, intl] = useTranslation("home", messages);
+
+  const navigate = useNavigate();
+
   const [user, setUser] = useState(useLoaderData());
 
   async function revokeUserAuth() {
@@ -20,22 +41,39 @@ export function Home() {
     }
   }
 
+  function selectLanguage(event) {
+    const language = event.target.value;
+
+    navigate(`/${language}`, { replace: true });
+  }
+
   return (
     <div className="home">
       <Helmet>
         <title>{process.env.PUBLIC_SITE_NAME}</title>
       </Helmet>
-      <h1>{process.env.PUBLIC_SITE_NAME}</h1>
       <div>
-        <Link to={"/users/create"}>
-          <button type="button">Registrarse</button>
-        </Link>
-        {user && <button type="button" onClick={revokeUserAuth}>Cerrar sesión</button>}
-        {!user && (
-          <Link to={"/users/auth"}>
-            <button type="button">Iniciar sesión</button>
+        <h1>{process.env.PUBLIC_SITE_NAME}</h1>
+        <div>
+          <select name="language" onChange={selectLanguage} value={intl.language}>
+            {Intl.languages.map((language, index) => (
+              <option key={index} value={language}>{language.toUpperCase()}</option>
+            ))}
+          </select>
+          <Link to={"users/create"}>
+            <button type="button">{translate("button.create")}</button>
           </Link>
-        )}
+          {user && (
+            <button type="button" onClick={revokeUserAuth}>
+              {translate("button.revoke")}
+            </button>
+          )}
+          {!user && (
+            <Link to={"users/auth"}>
+              <button type="button">{translate("button.auth")}</button>
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
