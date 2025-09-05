@@ -2,20 +2,32 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  row-gap: 16px;
 }
 
-.home h1 {
-  text-align: center;
-}
-
-.home div {
+.home > div {
   display: flex;
   justify-content: center;
   align-items: center;
+  column-gap: 16px;
+  padding: 8px 12px;
+}
+
+.home h1 {
+  padding: 0;
+}
+
+.home > div > div {
+  flex: 1;
+  display: flex;
+  justify-content: end;
+  align-items: center;
   column-gap: 8px;
+}
+
+.home select {
+  padding: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
 }
 
 .home button {
