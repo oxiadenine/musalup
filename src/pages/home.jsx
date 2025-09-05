@@ -44,6 +44,8 @@ export function Home() {
   function selectLanguage(event) {
     const language = event.target.value;
 
+    localStorage.setItem("lang", language);
+
     navigate(`/${language}`, { replace: true });
   }
 

@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import i18n from "i18next";
+import { matchPath, replace } from "react-router";
 
 export class Intl {
+  static instance = i18n;
   static languages = ["es", "en"];
   static events = ["languageChanged"];
 
@@ -18,7 +20,7 @@ export class Intl {
   }
 }
 
-export const IntlContext = createContext(i18n);
+export const IntlContext = createContext(Intl.instance);
 
 export function useTranslation(namespace, messages) {
   const intl = useContext(IntlContext);
@@ -56,4 +58,36 @@ export function useTranslation(namespace, messages) {
   }, [intl]);
 
   return [translate, intl];
+}
+
+export function rewritePath({ request }) {
+  const intl = Intl.instance;
+  
+  const url = new URL(request.url);
+
+  const defaultLanguage = intl.options.fallbackLng[0];
+
+  const params = matchPath("/:lang?/*", url.pathname).params;
+
+  if (!params.lang || !Intl.languages.includes(params.lang)) {
+    const language = localStorage.getItem("lang") ?? defaultLanguage;
+
+    intl.changeLanguage(language);
+
+    const pathname = url.pathname === "/" ? "" : url.pathname;
+
+    return replace(`${url.origin}/${language}${pathname}`);
+  }
+
+  intl.changeLanguage(params.lang);
+}
+
+export function setLanguage() {
+  const intl = Intl.instance;
+  
+  const defaultLanguage = intl.options.fallbackLng[0];
+
+  const language = localStorage.getItem("lang") ?? defaultLanguage;
+
+  intl.changeLanguage(language);
 }
