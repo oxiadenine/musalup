@@ -1,11 +1,12 @@
 import { redirect } from "react-router";
 import { UserCreate } from "./user-create";
 import { UserAuth } from "./user-auth";
+import { translation } from "../lib/intl";
 
 export const userRoutes = [
-  { path: "/users/create", Component: UserCreate },
+  { path: "users/create", Component: UserCreate },
   {
-    path: "/users/auth",
+    path: "users/auth",
     loader: async () => {
       const userId = localStorage.getItem("userId");
 
@@ -16,7 +17,7 @@ export const userRoutes = [
         });
 
         if (response.ok) {
-          return redirect("/");
+          return redirect(`/${translation.language}`);
         } else {
           localStorage.removeItem("userId");
         }

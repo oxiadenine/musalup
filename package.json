@@ -17,6 +17,7 @@
   },
   "type": "module",
   "dependencies": {
+    "i18next": "^25.4.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-helmet-async": "^2.0.5",
