@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLoaderData, Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
-import { languages, useTranslation } from "../lib/intl";
+import { useTranslation } from "../lib/intl";
 import "./home.css";
 
 const messages = {
@@ -26,7 +26,9 @@ export function Home() {
 
   const navigate = useNavigate();
 
-  const [user, setUser] = useState(useLoaderData());
+  const data = useLoaderData();
+
+  const [user, setUser] = useState(data.user);
 
   async function revokeUserAuth() {
     const response = await fetch(`/api/users/${user.id}/auth/revoke`, {
@@ -58,7 +60,7 @@ export function Home() {
         <h1>{process.env.PUBLIC_SITE_NAME}</h1>
         <div>
           <select name="language" onChange={selectLanguage} value={translation.language}>
-            {languages.map((language, index) => (
+            {data.languages.map((language, index) => (
               <option key={index} value={language}>{language.toUpperCase()}</option>
             ))}
           </select>
@@ -80,5 +82,3 @@ export function Home() {
     </div>
   );
 }
-
-export default Home;

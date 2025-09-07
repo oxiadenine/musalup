@@ -1,9 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import i18next from "i18next";
-import { matchPath, replace, unstable_createContext } from "react-router";
-
-export const languages = ["es", "en"];
-export const defaultLanguage = languages[0];
+import { unstable_createContext } from "react-router";
 
 export { i18next as translation };
 
@@ -54,31 +51,3 @@ export function useTranslation(namespace, messages) {
 }
 
 export const translationContext = unstable_createContext(i18next);
-
-export async function rewritePath({ context, request }) {
-  const translation = context.get(translationContext);
-
-  const url = new URL(request.url);
-
-  const params = matchPath("/:lang?/*", url.pathname).params;
-
-  if (!params.lang || !languages.includes(params.lang)) {
-    const language = localStorage.getItem("lang") ?? translation.options.fallbackLng[0];
-
-    await translation.changeLanguage(language);
-
-    const pathname = url.pathname === "/" ? "" : url.pathname;
-
-    throw replace(`${url.origin}/${language}${pathname}`);
-  }
-
-  await translation.changeLanguage(params.lang);
-}
-
-export async function setLanguage({ context }) {
-  const translation = context.get(translationContext);
-  
-  const language = localStorage.getItem("lang") ?? translation.options.fallbackLng[0];
-
-  await translation.changeLanguage(language);
-}

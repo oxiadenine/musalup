@@ -1,12 +1,16 @@
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, matchPath, replace } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { HelmetProvider } from "react-helmet-async";
-import { languages, defaultLanguage, translation, TranslationContext, rewritePath, setLanguage } from "./lib/intl";
-import { Home } from "./pages/home";
-import { userRoutes } from "./pages/user-routes";
-import { NotFound } from "./pages/not-found";
+import { translation, TranslationContext, translationContext } from "./lib/intl";
+import { homeRoute } from "./pages/home-route";
+import { userCreateRoute } from "./pages/user-create-route";
+import { userAuthRoute } from "./pages/user-auth-route";
+import { notFoundRoute } from "./pages/not-found-route";
 import "./index.css";
+
+const languages = ["es", "en"];
+const defaultLanguage = languages[0];
 
 translation.init({
   lng: new Intl.Locale(navigator.language).language,
@@ -21,38 +25,32 @@ translation.on("languageChanged", () => {
 });
 
 const router = createBrowserRouter([
-  ...["", ...languages].map(language => {
-    return {
-      path: `${language}`,
-      loader: rewritePath,
-      children: [
-        {
-          index: true,
-          loader: async () => {
-            const userId = localStorage.getItem("userId");
+  ...["", ...languages].map(language => (
+    {
+      path: `/${language}`,
+      loader: async ({ context, request }) => {
+        const translation = context.get(translationContext);
 
-            if (userId) {
-              const response = await fetch(`/api/users/${userId}`, {
-                method: "GET",
-                headers: { "Accept": "application/json" }
-              });
+        const url = new URL(request.url);
 
-              if (response.ok) {
-                return (await response.json()).user;
-              } else {
-                localStorage.removeItem("userId");
-              }
-            }
+        const params = matchPath("/:lang?/*", url.pathname).params;
 
-            return undefined;
-          },
-          Component: Home
-        },
-        ...userRoutes
-      ]
+        if (!params.lang || !languages.includes(params.lang)) {
+          const language = localStorage.getItem("lang") ?? translation.options.fallbackLng[0];
+
+          await translation.changeLanguage(language);
+
+          const pathname = url.pathname === "/" ? "" : url.pathname;
+
+          throw replace(`${url.origin}/${language}${pathname}`);
+        }
+
+        await translation.changeLanguage(params.lang);
+      },
+      children: [homeRoute(languages), userCreateRoute, userAuthRoute]
     }
-  }),
-  { path: "*", loader: setLanguage, Component: NotFound }
+  )),
+  notFoundRoute
 ]);
 
 const app = (

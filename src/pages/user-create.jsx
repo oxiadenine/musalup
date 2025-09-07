@@ -124,5 +124,3 @@ export function UserCreate() {
     </div>
   );
 }
-
-export default UserCreate;
