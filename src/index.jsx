@@ -2,20 +2,26 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { HelmetProvider } from "react-helmet-async";
-import { Intl, IntlContext, rewritePath, setLanguage } from "./lib/intl";
+import { languages, defaultLanguage, translation, TranslationContext, rewritePath, setLanguage } from "./lib/intl";
 import { Home } from "./pages/home";
 import { userRoutes } from "./pages/user-routes";
 import { NotFound } from "./pages/not-found";
 import "./index.css";
 
-const intl = Intl.initialize(navigator.language);
+translation.init({
+  lng: new Intl.Locale(navigator.language).language,
+  fallbackLng: defaultLanguage,
+  supportedLngs: languages,
+  ns: [],
+  debug: process.env.NODE_ENV === "development" ? true : false
+});
 
-intl.on(Intl.events[0], () => {
-  document.documentElement.lang = intl.language;
+translation.on("languageChanged", () => {
+  document.documentElement.lang = translation.language;
 });
 
 const router = createBrowserRouter([
-  ...["", ...Intl.languages].map(language => {
+  ...["", ...languages].map(language => {
     return {
       path: `${language}`,
       loader: rewritePath,
@@ -42,7 +48,7 @@ const router = createBrowserRouter([
           },
           Component: Home
         },
-        ...userRoutes,
+        ...userRoutes
       ]
     }
   }),
@@ -51,9 +57,9 @@ const router = createBrowserRouter([
 
 const app = (
   <HelmetProvider>
-    <IntlContext value={intl}>
+    <TranslationContext value={translation}>
       <RouterProvider router={router} />
-    </IntlContext>
+    </TranslationContext>
   </HelmetProvider>
 );
 

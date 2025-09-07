@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLoaderData, Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
-import { Intl, useTranslation } from "../lib/intl";
+import { languages, useTranslation } from "../lib/intl";
 import "./home.css";
 
 const messages = {
@@ -22,7 +22,7 @@ const messages = {
 };
 
 export function Home() {
-  const [translate, intl] = useTranslation("home", messages);
+  const [translate, translation] = useTranslation("home", messages);
 
   const navigate = useNavigate();
 
@@ -57,8 +57,8 @@ export function Home() {
       <div>
         <h1>{process.env.PUBLIC_SITE_NAME}</h1>
         <div>
-          <select name="language" onChange={selectLanguage} value={intl.language}>
-            {Intl.languages.map((language, index) => (
+          <select name="language" onChange={selectLanguage} value={translation.language}>
+            {languages.map((language, index) => (
               <option key={index} value={language}>{language.toUpperCase()}</option>
             ))}
           </select>

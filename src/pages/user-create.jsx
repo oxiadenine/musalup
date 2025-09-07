@@ -47,7 +47,7 @@ const messages = {
 };
 
 export function UserCreate() {
-  const [translate, intl] = useTranslation("user-create", messages);
+  const [translate, translation] = useTranslation("user-create", messages);
   
   const navigate = useNavigate();
 
@@ -86,7 +86,7 @@ export function UserCreate() {
     });
 
     if (response.ok) {
-      navigate(`/${intl.language}/users/auth`);
+      navigate(`/${translation.language}/users/auth`);
     } else {
       if (response.status === 409) {
         errors.nickname.push({ message: translate("error.nickname.duplicate") });

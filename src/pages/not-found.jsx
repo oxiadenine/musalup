@@ -15,7 +15,7 @@ const messages = {
 };
 
 export function NotFound() {
-  const [translate, intl] = useTranslation("not-found", messages);
+  const [translate, translation] = useTranslation("not-found", messages);
 
   return (
     <div className="not-found">
@@ -23,7 +23,7 @@ export function NotFound() {
         <title>{process.env.PUBLIC_SITE_NAME} | 404</title>
       </Helmet>
       <h1>{translate("title")}</h1>
-      <Link to={`/${intl.language}`}>{translate("link")}</Link>
+      <Link to={`/${translation.language}`}>{translate("link")}</Link>
     </div>
   );
 }

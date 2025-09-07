@@ -49,7 +49,7 @@ const messages = {
 };
 
 export function UserAuth() {
-  const [translate, intl] = useTranslation("user-auth", messages);
+  const [translate, translation] = useTranslation("user-auth", messages);
 
   const navigate = useNavigate();
 
@@ -92,7 +92,7 @@ export function UserAuth() {
 
       localStorage.setItem("userId", userId);
 
-      navigate(`/${intl.language}`);
+      navigate(`/${translation.language}`);
     } else {
       if (response.status === 403) {
         errors.nickname.push({ message: translate("error.nickname.none") });
