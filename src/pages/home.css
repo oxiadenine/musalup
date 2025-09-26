@@ -4,7 +4,7 @@
   flex-direction: column;
 }
 
-.home > div {
+.home > div:first-child {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -12,11 +12,11 @@
   padding: 8px 12px;
 }
 
-.home h1 {
+.home > div:first-child > h1 {
   padding: 0;
 }
 
-.home > div > div {
+.home > div:first-child > div {
   flex: 1;
   display: flex;
   justify-content: end;
@@ -24,18 +24,25 @@
   column-gap: 8px;
 }
 
-.home select {
+.home > div:first-child > div select {
   padding: 4px;
   cursor: pointer;
   text-transform: uppercase;
 }
 
-.home button {
+.home > div:first-child > div button {
   padding: 4px;
   cursor: pointer;
 }
 
-.home a {
+.home > div:first-child > div a {
   color: inherit;
   text-decoration: none;
+}
+
+.home > div:last-child {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
