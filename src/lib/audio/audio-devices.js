@@ -4,8 +4,8 @@ export async function getInputStream() {
       audio: {
         channelCount: { max: 2, min: 1, ideal: 2 },
         sampleSize: { max: 32, min: 16, ideal: 32 },
-        sampleRate: { max: 48, min: 44, ideal: 48 },
-        latency: { max: 10.0, min: 0.0, ideal: 0.0 },
+        sampleRate: { max: 48000, min: 44100, ideal: 48000 },
+        latency: { max: 10, min: 0, ideal: 0 },
         autoGainControl: { ideal: false },
         echoCancellation: { ideal: false },
         noiseSuppression: { ideal: false }
