@@ -63,21 +63,25 @@ class WaveAudioEncoder {
           offset += 4;
         }
 
-        // Convert the 32-bit float sample to a 16-bit signed integer sample
+        // Clamp 32-bit float samples to 16-bit integer samples with dithering 
         if (bitDepth === 16) {
           const signedInt16Size = Math.pow(2, bitDepth) / 2;
+          const leastSignificantBit = 1 / Math.pow(2, bitDepth - 1);
 
-          let sample = channel[sampleIndex] * signedInt16Size;
+          // Triangular dithering (TPDF)
+          const dither = (Math.random() + Math.random() - 1) * leastSignificantBit;
+          
+          const ditheredSample = channel[sampleIndex] + dither;
 
-          if (sample < -signedInt16Size) {
-            sample = Math.floor(-signedInt16Size);
-          } else if (sample > signedInt16Size - 1) {
-            sample = Math.floor(signedInt16Size - 1);
+          let clampedSample = Math.max(-1.0, Math.min(1.0, ditheredSample));
+
+          if (clampedSample < 0) {
+            clampedSample = Math.round(clampedSample * signedInt16Size);
           } else {
-            sample = Math.floor(sample);
+            clampedSample = Math.round(clampedSample * (signedInt16Size - 1));
           }
 
-          dataView.setInt16(offset, sample, true);
+          dataView.setInt16(offset, clampedSample, true);
 
           offset += 2;
         }
