@@ -36,32 +36,18 @@ class WaveAudioEncoder {
     this.formatData.byteRate = this.sampleRate * channelCount * bytesPerSample;
     this.formatData.blockAlign = channelCount * bytesPerSample;
     
-    this.encodedData = new Uint8Array(44 + this.formatData.subchunk2Size);
+    this.encodedData = new ArrayBuffer(44 + this.formatData.subchunk2Size);
   }
   
-  // Write a string as 16-bit integers with byte order (big-endian)
-  writeString(string, offset) {
+  // Encode a string as 8-bit unsigned integers
+  encodeString(dataView, offset, string) {
     for (let charIndex = 0; charIndex < string.length; charIndex++) {
-      this.encodedData[offset + charIndex] = string.charCodeAt(charIndex);
+      dataView.setUint8(offset + charIndex, string.charCodeAt(charIndex));
     }
   }
 
-  // Write an integer as a 16-bit integer with byte order (little-endian)
-  writeInt16(integer, offset) {
-    this.encodedData[offset + 0] = integer & 255;
-    this.encodedData[offset + 1] = (integer >> 8) & 255;
-  }
-
-  // Write an integer as a 32-bit integer with byte order (little-endian)
-  writeInt32(integer, offset) {
-    this.encodedData[offset + 0] = integer & 255;
-    this.encodedData[offset + 1] = (integer >> 8) & 255;
-    this.encodedData[offset + 2] = (integer >> 16) & 255;
-    this.encodedData[offset + 3] = (integer >> 24) & 255;
-  }
-
-  // Write 32-bit float samples as integer samples based on bit depth
-  writeSampleData(data, offset) {
+  // Encode 32-bit float samples as integer samples based on bit depth
+  encodeSampleData(dataView, offset, data) {
     const channelCount = this.formatData.numberOfChannels;
     const bitDepth = this.formatData.bitsPerSample;
 
@@ -69,17 +55,10 @@ class WaveAudioEncoder {
       for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
         const channel = data[channelIndex];
 
-        // Convert the 32-bit float sample to a 32-bit signed integer sample
         if (bitDepth === 32) {
-          const sampleBuffer = new ArrayBuffer(4);
+          const sample = channel[sampleIndex];
 
-          (new Float32Array(sampleBuffer))[0] = channel[sampleIndex];
-          let sample = (new Uint32Array(sampleBuffer))[0];
-
-          // Convert to a signed integer
-          sample = sample | 0;
-
-          this.writeInt32(sample, offset);
+          dataView.setFloat32(offset, sample, true);
 
           offset += 4;
         }
@@ -98,7 +77,7 @@ class WaveAudioEncoder {
             sample = Math.floor(sample);
           }
 
-          this.writeInt16(sample, offset);
+          dataView.setInt16(offset, sample, true);
 
           offset += 2;
         }
@@ -107,23 +86,25 @@ class WaveAudioEncoder {
   }
 
   encode() {
-    this.writeString(this.formatData.chunkId, 0);
-    this.writeInt32(this.formatData.chunkSize, 4);
-    this.writeString(this.formatData.format, 8);
+    const encodedDataView = new DataView(this.encodedData);
 
-    this.writeString(this.formatData.subchunk1Id, 12);
-    this.writeInt32(this.formatData.subchunk1Size, 16);
-    this.writeInt16(this.formatData.audioFormat, 20);
-    this.writeInt16(this.formatData.numberOfChannels, 22);
-    this.writeInt32(this.formatData.sampleRate, 24);
-    this.writeInt32(this.formatData.byteRate, 28);
-    this.writeInt16(this.formatData.blockAlign, 32);
-    this.writeInt32(this.formatData.bitsPerSample, 34);
+    this.encodeString(encodedDataView, 0 ,this.formatData.chunkId);
+    encodedDataView.setUint32(4, this.formatData.chunkSize, true);
+    this.encodeString(encodedDataView, 8, this.formatData.format);
 
-    this.writeString(this.formatData.subchunk2Id, 36);
-    this.writeInt32(this.formatData.subchunk2Size, 40);
+    this.encodeString(encodedDataView, 12, this.formatData.subchunk1Id);
+    encodedDataView.setUint32(16, this.formatData.subchunk1Size, true);
+    encodedDataView.setUint16(20, this.formatData.audioFormat, true);
+    encodedDataView.setUint16(22, this.formatData.numberOfChannels, true);
+    encodedDataView.setUint32(24, this.formatData.sampleRate, true);
+    encodedDataView.setUint32(28, this.formatData.byteRate, true);
+    encodedDataView.setUint16(32, this.formatData.blockAlign, true);
+    encodedDataView.setUint32(34, this.formatData.bitsPerSample, true);
 
-    this.writeSampleData(this.data, 44);
+    this.encodeString(encodedDataView, 36, this.formatData.subchunk2Id);
+    encodedDataView.setUint32(40, this.formatData.subchunk2Size, true);
+
+    this.encodeSampleData(encodedDataView, 44, this.data);
 
     return this.encodedData;
   }
