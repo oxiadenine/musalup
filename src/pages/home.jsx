@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLoaderData, Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "../lib/intl";
+import { AudioRecorder } from "./components/audio-recorder";
 import "./home.css";
 
 const messages = {
@@ -78,6 +79,9 @@ export function Home() {
             </Link>
           )}
         </div>
+      </div>
+      <div>
+        <AudioRecorder />
       </div>
     </div>
   );
