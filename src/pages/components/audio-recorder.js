@@ -55,20 +55,21 @@ export function AudioRecorder() {
         audioContextRef.current, 
         "recorder-worklet", 
         {
+          outputChannelCount: [channelCount],
           processorOptions: {
             channelCount,
             sampleRate,
-            recordingTime: 10
+            recordingDuration: 10
           }
         }
       );
 
-      audioRecorderNodeRef.current.port.postMessage({ event: "start" });
+      audioRecorderNodeRef.current.port.postMessage({ type: "start" });
 
       audioRecorderNodeRef.current.port.onmessage = async ({ data }) => {
-        if (data.event === "record") {
-          setRecordingLength(data.recordingLength);
-        } else if (data.event === "stop") {
+        if (data.type === "record") {
+          setRecordingLength(data.recordingTime);
+        } else if (data.type === "stop") {
           audioTrack.stop();
           inputStream.removeTrack(audioTrack);
           inputStreamNode.disconnect();
@@ -78,15 +79,17 @@ export function AudioRecorder() {
           const audioEncoder = new Worker(audioEncoderFile);
 
           audioEncoder.onmessage = async ({ data }) => {
-            const recordingFile = new Blob([data.encodedData], { type: data.mimeType });
+            if (data.type === "encode") {
+              const recordingFile = new Blob([data.encodedData], { type: data.mimeType });
 
-            setRecordingFileUrl(URL.createObjectURL(recordingFile));
+              setRecordingFileUrl(URL.createObjectURL(recordingFile));
+            }
           };
 
           audioEncoder.postMessage({
-            event: "encode",
+            type: "encode",
             audioData: data.recordedData,
-            frameCount: data.recordedFrames,
+            frameCount: data.recordedFrameCount,
             sampleRate,
             use32bitFloat: true
           });
@@ -104,7 +107,7 @@ export function AudioRecorder() {
   }
 
   async function stop() {
-    audioRecorderNodeRef.current.port.postMessage({ event: "stop" });
+    audioRecorderNodeRef.current.port.postMessage({ type: "stop" });
   }
 
   return (

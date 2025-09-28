@@ -2,95 +2,89 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
 
-    this.channelCount = options?.processorOptions?.channelCount ?? 0;
-    this.sampleRate = options?.processorOptions?.sampleRate ?? 0;
-    this.recordingFrames = this.sampleRate * (options?.processorOptions?.recordingTime ?? 0);
-    this.recordingIntervalFrames = this.sampleRate * (15 / 1000);
+    const { processorOptions } = options;
+
+    this.channelCount = processorOptions.channelCount;
+    this.frameCount = 0;
+    this.sampleRate = processorOptions.sampleRate;
 
     this.isRecording = false;
-    this.recordedFrames = 0;
-    this.recordedData = new Array(this.channelCount).fill(new Float32Array(this.recordingFrames));
-
-    this.processingFrameCount = 0;
-    this.processedFrames = 0;
+    this.recordingFrameCount = this.sampleRate * (processorOptions.recordingDuration);
+    this.recordedFrameCount = 0;
+    this.recordedData = new Array(this.channelCount).fill(new Float32Array(this.recordingFrameCount));
 
     this.port.onmessage = ({ data }) => {
-      if (data.event === "start") {
+      if (data.type === "start") {
         this.isRecording = true;
-      } else if (data.event === "stop") {
-        this.isRecording = false;
+      } else if (data.type === "stop") {
+        this.isRecording = false;       
 
         this.port.postMessage({
-          event: "stop",
-          recordedFrames: this.recordedFrames,
+          type: "stop",
+          recordedFrameCount: this.recordedFrameCount,
           recordedData: this.recordedData
         });
       }
     };
   }
 
-  get recordingLength() {
-    return Math.round(this.recordedFrames / this.sampleRate * 1000) / 1000;
+  get recordingTime() {
+    return Math.round(this.recordedFrameCount / this.sampleRate * 1000) / 1000;
   }
 
   process(inputs, outputs, parameters) {
-    const inputCount = inputs.length > 1 ? 1 : inputs.length;
+    if (inputs.length === 0) {
+      return true;
+    }
 
-    for (let inputIndex = 0; inputIndex < inputCount; inputIndex++) {
-      const input = inputs[inputIndex];
+    const input = inputs[0];
+    const output = outputs[0];
 
-      const channelCount = input.length !== this.channelCount ? input.length : this.channelCount;
+    for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+      const channel = input[channelIndex];
 
-      for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
-        const channel = input[channelIndex];
+      if (this.frameCount === 0) {
+        this.frameCount = channel.length;
+      }
 
-        if (this.processingFrameCount === 0) {
-          this.processingFrameCount = channel.length;
+      for (let sampleIndex = 0; sampleIndex < this.frameCount; sampleIndex++) {
+        const sample = channel[sampleIndex];
+
+        if (this.isRecording) {
+          const recordingSampleIndex = sampleIndex + this.recordedFrameCount;
+
+          this.recordedData[channelIndex][recordingSampleIndex] = sample;
         }
 
-        for (let sampleIndex = 0; sampleIndex < this.processingFrameCount; sampleIndex++) {
-          const sample = channel[sampleIndex];
-
-          if (this.isRecording) {
-            const recordingSampleIndex = sampleIndex + this.recordedFrames;
-
-            this.recordedData[channelIndex][recordingSampleIndex] = sample;
-          }
-
-          outputs[inputIndex][channelIndex][sampleIndex] = sample;
-        }
+        output[channelIndex][sampleIndex] = sample;
       }
     }
 
     if (this.isRecording) {
-      if (this.recordedFrames + this.processingFrameCount < this.recordingFrames) {
-        this.recordedFrames += this.processingFrameCount;
-
-        if (this.processedFrames >= this.recordingIntervalFrames) {
-          this.processedFrames = 0;
-
-          this.port.postMessage({
-            event: "record",
-            recordingLength: this.recordingLength
-          });
-        } else {
-          this.processedFrames += this.processingFrameCount;
-        }
-      } else {
-        this.recordedFrames += this.processingFrameCount;
+      if (this.recordedFrameCount + this.frameCount < this.recordingFrameCount) {
+        this.recordedFrameCount += this.frameCount;
 
         this.port.postMessage({
-          event: "record",
-          recordingLength: this.recordingLength
+          type: "record",
+          recordingTime: this.recordingTime
+        });
+      } else {
+        this.recordedFrameCount += this.frameCount;
+
+        this.port.postMessage({
+          type: "record",
+          recordingTime: this.recordingTime
         });
 
         this.isRecording = false;
 
         this.port.postMessage({
-          event: "stop",
-          recordedFrames: this.recordedFrames,
+          type: "stop",
+          recordedFrameCount: this.recordedFrameCount,
           recordedData: this.recordedData
         });
+
+        this.recordedFrameCount = 0;
 
         return false;
       }

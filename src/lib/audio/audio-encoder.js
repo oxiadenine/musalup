@@ -115,7 +115,7 @@ class WaveAudioEncoder {
 }
 
 onmessage = ({ data }) => {
-  if (data.event === "encode") {
+  if (data.type === "encode") {
     const waveAudioEncoder = new WaveAudioEncoder(data.audioData, {
       frameCount: data.frameCount,
       sampleRate: data.sampleRate,
@@ -124,6 +124,6 @@ onmessage = ({ data }) => {
 
     const encodedData = waveAudioEncoder.encode();
 
-    postMessage({ event: "encode", encodedData, mimeType: "audio/wave" });
+    postMessage({ type: "encode", encodedData, mimeType: "audio/wave" });
   }
 };
