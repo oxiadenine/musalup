@@ -59,14 +59,14 @@ export function UserCreate() {
 
     const validation = UserValidation.validate(user, {
       nickname: {
-        empty: translate("error.nickname.empty"),
-        length: translate("error.nickname.length"),
-        format: translate("error.nickname.format")
+        empty: translate("user-create:error.nickname.empty"),
+        length: translate("user-create:error.nickname.length"),
+        format: translate("user-create:error.nickname.format")
       },
       password: {
-        empty: translate("error.password.empty"),
-        length: translate("error.password.length"),
-        format: translate("error.password.format")
+        empty: translate("user-create:error.password.empty"),
+        length: translate("user-create:error.password.length"),
+        format: translate("user-create:error.password.format")
       }
     });
 
@@ -89,7 +89,7 @@ export function UserCreate() {
       navigate(`/${translation.language}/users/auth`);
     } else {
       if (response.status === 409) {
-        errors.nickname.push({ message: translate("error.nickname.duplicate") });
+        errors.nickname.push({ message: translate("user-create:error.nickname.duplicate") });
       }
 
       return { user, errors };
@@ -101,25 +101,25 @@ export function UserCreate() {
   return (
     <div className="user-create">
       <Helmet>
-        <title>{translate("meta.title")}</title>
+        <title>{translate("user-create:meta.title")}</title>
       </Helmet>
-      <h1>{translate("title")}</h1>
+      <h1>{translate("user-create:title")}</h1>
       <form action={action}>
         <input
           name="nickname"
           type="text"
-          placeholder={translate("input.nickname")}
+          placeholder={translate("user-create:input.nickname")}
           defaultValue={data.user?.nickname}
         />
         {data.errors && data.errors.nickname[0] && <p>{data.errors.nickname[0].message}</p>}
         <input
           name="password"
           type="password"
-          placeholder={translate("input.password")}
+          placeholder={translate("user-create:input.password")}
           defaultValue={data.user?.password}
         />
         {data.errors && data.errors.password[0] && <p>{data.errors.password[0].message}</p>}
-        <button type="submit" disabled={isPending}>{translate("button")}</button>
+        <button type="submit" disabled={isPending}>{translate("user-create:button")}</button>
       </form>
     </div>
   );

@@ -17,6 +17,7 @@ translation.init({
   fallbackLng: defaultLanguage,
   supportedLngs: languages,
   ns: [],
+  defaultNS: false,
   debug: process.env.NODE_ENV === "development" ? true : false
 });
 

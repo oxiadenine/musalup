@@ -19,8 +19,6 @@ export function useTranslation(namespace, messages) {
     async function loadTranslations() {
       await translation.loadNamespaces(namespace);
 
-      translation.setDefaultNamespace(namespace);
-
       Object.keys(messages).forEach(language => {
         translation.addResourceBundle(language, namespace, messages[language]);
       });

@@ -61,14 +61,14 @@ export function UserAuth() {
 
     const validation = UserValidation.validate(user, {
       nickname: {
-        empty: translate("error.nickname.empty"),
-        length: translate("error.nickname.length"),
-        format: translate("error.nickname.format")
+        empty: translate("user-auth:error.nickname.empty"),
+        length: translate("user-auth:error.nickname.length"),
+        format: translate("user-auth:error.nickname.format")
       },
       password: {
-        empty: translate("error.password.empty"),
-        length: translate("error.password.length"),
-        format: translate("error.password.format")
+        empty: translate("user-auth:error.password.empty"),
+        length: translate("user-auth:error.password.length"),
+        format: translate("user-auth:error.password.format")
       }
     });
 
@@ -95,9 +95,9 @@ export function UserAuth() {
       navigate(`/${translation.language}`);
     } else {
       if (response.status === 403) {
-        errors.nickname.push({ message: translate("error.nickname.none") });
+        errors.nickname.push({ message: translate("user-auth:error.nickname.none") });
       } else if (response.status === 401) {
-        errors.password.push({ message: translate("error.password.validity") });
+        errors.password.push({ message: translate("user-auth:error.password.validity") });
       }
 
       return { user, errors };
@@ -113,25 +113,25 @@ export function UserAuth() {
   return (
     <div className="user-auth">
       <Helmet>
-        <title>{translate("meta.title")}</title>
+        <title>{translate("user-auth:meta.title")}</title>
       </Helmet>
-      <h1>{translate("title")}</h1>
+      <h1>{translate("user-auth:title")}</h1>
       <form action={action}>
         <input
           name="nickname"
           type="text"
-          placeholder={translate("input.nickname")}
+          placeholder={translate("user-auth:input.nickname")}
           defaultValue={data.user?.nickname}
         />
         {data.errors && data.errors.nickname[0] && <p>{data.errors.nickname[0].message}</p>}
         <input
           name="password"
           type="password"
-          placeholder={translate("input.password")}
+          placeholder={translate("user-auth:input.password")}
           defaultValue={data.user?.password}
         />
         {data.errors && data.errors.password[0] && <p>{data.errors.password[0].message}</p>}
-        <button type="submit" disabled={isPending}>{translate("button")}</button>
+        <button type="submit" disabled={isPending}>{translate("user-auth:button")}</button>
       </form>
     </div>
   );

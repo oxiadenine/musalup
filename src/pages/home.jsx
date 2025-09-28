@@ -66,16 +66,16 @@ export function Home() {
             ))}
           </select>
           <Link to={"users/create"}>
-            <button type="button">{translate("button.create")}</button>
+            <button type="button">{translate("home:button.create")}</button>
           </Link>
           {user && (
             <button type="button" onClick={revokeUserAuth}>
-              {translate("button.revoke")}
+              {translate("home:button.revoke")}
             </button>
           )}
           {!user && (
             <Link to={"users/auth"}>
-              <button type="button">{translate("button.auth")}</button>
+              <button type="button">{translate("home:button.auth")}</button>
             </Link>
           )}
         </div>

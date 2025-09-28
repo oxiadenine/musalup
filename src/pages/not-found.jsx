@@ -22,8 +22,8 @@ export function NotFound() {
       <Helmet>
         <title>{process.env.PUBLIC_SITE_NAME} | 404</title>
       </Helmet>
-      <h1>{translate("title")}</h1>
-      <Link to={`/${translation.language}`}>{translate("link")}</Link>
+      <h1>{translate("not-found:title")}</h1>
+      <Link to={`/${translation.language}`}>{translate("not-found:link")}</Link>
     </div>
   );
 }
