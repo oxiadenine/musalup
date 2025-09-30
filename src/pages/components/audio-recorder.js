@@ -24,8 +24,10 @@ export function AudioRecorder() {
   const [translate] = useTranslation("audio-recorder", messages);
 
   const audioContextRef = useRef(undefined);
+  //const inputStreamRef = useRef(undefined);
+  const inputStreamNodeRef = useRef(undefined);
   const audioRecorderNodeRef = useRef(undefined);
-
+  
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingLength, setRecordingLength] = useState(0.0);
@@ -38,18 +40,26 @@ export function AudioRecorder() {
 
     const inputStream = await getInputStream();
 
-    if (inputStream) {
+    if (!inputStream) {
+      return;
+    }
+
+    const audioTrack = inputStream.getAudioTracks()[0];
+    const audioTrackSettings = audioTrack.getSettings();
+
+    const channelCount = audioTrackSettings.channelCount;
+    const sampleRate = audioTrackSettings.sampleRate ?? 48000;
+
+    if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext();
+    }
 
+    if (!inputStreamNodeRef.current) {
+      inputStreamNodeRef.current = audioContextRef.current.createMediaStreamSource(inputStream);
+    }
+
+    if (!audioRecorderNodeRef.current) {
       await audioContextRef.current.audioWorklet.addModule(audioRecorderFile);
-
-      const audioTrack = inputStream.getAudioTracks()[0];
-      const audioTrackSettings = audioTrack.getSettings();
-
-      const channelCount = audioTrackSettings.channelCount;
-      const sampleRate = audioTrackSettings.sampleRate ?? 44100;
-
-      const inputStreamNode = audioContextRef.current.createMediaStreamSource(inputStream);
 
       audioRecorderNodeRef.current = new AudioWorkletNode(
         audioContextRef.current, 
@@ -64,17 +74,14 @@ export function AudioRecorder() {
         }
       );
 
-      audioRecorderNodeRef.current.port.postMessage({ type: "start" });
-
       audioRecorderNodeRef.current.port.onmessage = async ({ data }) => {
         if (data.type === "record") {
           setRecordingLength(data.recordingTime);
         } else if (data.type === "stop") {
           audioTrack.stop();
-          inputStream.removeTrack(audioTrack);
-          inputStreamNode.disconnect();
 
-          await audioContextRef.current.close();
+          inputStreamNodeRef.current.disconnect();
+          inputStreamNodeRef.current = undefined;
 
           const audioEncoder = new Worker(audioEncoderFile);
 
@@ -97,12 +104,17 @@ export function AudioRecorder() {
           setIsRecording(false);
         }
       };
-
-      inputStreamNode.connect(audioRecorderNodeRef.current);
-
-      setIsRecording(true);
     }
 
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume();
+    }
+
+    audioRecorderNodeRef.current.port.postMessage({ type: "start" });
+
+    inputStreamNodeRef.current.connect(audioRecorderNodeRef.current);
+
+    setIsRecording(true);
     setIsRecordingAllowed(true);
   }
 
