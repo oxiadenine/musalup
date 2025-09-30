@@ -30,7 +30,7 @@ export function AudioRecorder() {
   
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingLength, setRecordingLength] = useState(0.0);
+  const [recordingTime, setRecordingTime] = useState(0.0);
   const [recordingFileUrl, setRecordingFileUrl] = useState(undefined);
 
   const recordingAudioElementRef = useRef(undefined);
@@ -76,7 +76,7 @@ export function AudioRecorder() {
 
       audioRecorderNodeRef.current.port.onmessage = async ({ data }) => {
         if (data.type === "record") {
-          setRecordingLength(data.recordingTime);
+          setRecordingTime(data.recordingTime);
         } else if (data.type === "stop") {
           audioTrack.stop();
 
@@ -131,7 +131,7 @@ export function AudioRecorder() {
         <button disabled={!isRecording} onClick={stop}>
           {translate("audio-recorder:button.stop")}
         </button>
-        <h5>{`${recordingLength.toFixed(2)}s`}</h5>
+        <h5>{`${recordingTime.toFixed(2)}s`}</h5>
       </div>
       {recordingFileUrl && (
         <audio ref={recordingAudioElementRef} controls src={recordingFileUrl} />

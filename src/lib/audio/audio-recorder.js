@@ -13,12 +13,22 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
     this.recordedFrameCount = 0;
     this.recordingData = new Array(this.channelCount).fill(new Float32Array(this.recordingFrameCount));
 
+    this.recordIntervalTime = 0.1; // 100 ms
+    this.recordingStartTime = 0;
+    this.lastRecordingTime = 0;
+
     this.port.onmessage = ({ data }) => {
       if (data.type === "start") {
         this.isRecording = true;
-      } else if (data.type === "stop") {
-        this.isRecording = false;       
 
+        this.recordingStartTime = currentTime;
+        this.lastRecordingTime = currentTime;
+
+        this.port.postMessage({ type: "record", recordingTime: 0 });
+      } else if (data.type === "stop") {
+        this.isRecording = false;
+
+        this.port.postMessage({ type: "record", recordingTime: this.recordingTime });
         this.port.postMessage({
           type: "stop",
           recordedFrameCount: this.recordedFrameCount,
@@ -27,12 +37,15 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
 
         this.recordedFrameCount = 0;
         this.recordingData.fill(new Float32Array(this.recordingFrameCount));
+
+        this.recordingStartTime = 0;
+        this.lastRecordingTime = 0;
       }
     };
   }
 
   get recordingTime() {
-    return Math.round(this.recordedFrameCount / this.sampleRate * 1000) / 1000;
+    return currentTime - this.recordingStartTime;
   }
 
   get recordedData() {
@@ -81,20 +94,16 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
       if (this.recordedFrameCount + this.frameCount < this.recordingFrameCount) {
         this.recordedFrameCount += this.frameCount;
 
-        this.port.postMessage({
-          type: "record",
-          recordingTime: this.recordingTime
-        });
+        if (currentTime - this.lastRecordingTime >= this.recordIntervalTime) {
+          this.port.postMessage({ type: "record", recordingTime: this.recordingTime });
+
+          this.lastRecordingTime = currentTime;
+        }
       } else {
+        this.isRecording = false;
         this.recordedFrameCount += this.frameCount;
 
-        this.port.postMessage({
-          type: "record",
-          recordingTime: this.recordingTime
-        });
-
-        this.isRecording = false;
-
+        this.port.postMessage({ type: "record", recordingTime: this.recordingTime });
         this.port.postMessage({
           type: "stop",
           recordedFrameCount: this.recordedFrameCount,
@@ -103,6 +112,9 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
 
         this.recordedFrameCount = 0;
         this.recordingData.fill(new Float32Array(this.recordingFrameCount));
+
+        this.recordingStartTime = 0;
+        this.lastRecordingTime = 0;
 
         return false;
       }
