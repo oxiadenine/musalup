@@ -11,7 +11,7 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
     this.isRecording = false;
     this.recordingFrameCount = this.sampleRate * (processorOptions.recordingDuration);
     this.recordedFrameCount = 0;
-    this.recordedData = new Array(this.channelCount).fill(new Float32Array(this.recordingFrameCount));
+    this.recordingData = new Array(this.channelCount).fill(new Float32Array(this.recordingFrameCount));
 
     this.port.onmessage = ({ data }) => {
       if (data.type === "start") {
@@ -24,6 +24,9 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
           recordedFrameCount: this.recordedFrameCount,
           recordedData: this.recordedData
         });
+
+        this.recordedFrameCount = 0;
+        this.recordingData.fill(new Float32Array(this.recordingFrameCount));
       }
     };
   }
@@ -32,15 +35,29 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
     return Math.round(this.recordedFrameCount / this.sampleRate * 1000) / 1000;
   }
 
+  get recordedData() {
+    const recordedData = new Array(this.channelCount).fill(new Float32Array(this.recordedFrameCount));
+
+    for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+      const channel = this.recordingData[channelIndex].slice(0, this.recordedFrameCount);
+
+      recordedData[channelIndex] = channel;
+    }
+    
+    return recordedData;
+  }
+
   process(inputs, outputs, parameters) {
     if (inputs.length === 0) {
-      return true;
+      return false;
     }
 
     const input = inputs[0];
     const output = outputs[0];
 
-    for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+    const channelCount = Math.min(input.length, this.channelCount);
+
+    for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
       const channel = input[channelIndex];
 
       if (this.frameCount === 0) {
@@ -53,7 +70,7 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
         if (this.isRecording) {
           const recordingSampleIndex = sampleIndex + this.recordedFrameCount;
 
-          this.recordedData[channelIndex][recordingSampleIndex] = sample;
+          this.recordingData[channelIndex][recordingSampleIndex] = sample;
         }
 
         output[channelIndex][sampleIndex] = sample;
@@ -85,6 +102,7 @@ class RecorderWorkletProcessor extends AudioWorkletProcessor {
         });
 
         this.recordedFrameCount = 0;
+        this.recordingData.fill(new Float32Array(this.recordingFrameCount));
 
         return false;
       }
