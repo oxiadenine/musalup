@@ -1,0 +1,64 @@
+.audio-looper {
+  display: flex;
+  flex-direction: column;
+  row-gap: 16px;
+  justify-items: center;
+  align-items: center;
+  padding: 8px;
+}
+
+.audio-looper > div:nth-child(1) {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 32px 24px;
+  grid-gap: 8px;
+  justify-items: center;
+  align-items: center;
+}
+
+.audio-looper > div:nth-child(2) {
+  display: flex;
+  column-gap: 16px;
+  justify-content: center;
+  align-items: center;
+  height: 32px;
+  margin-bottom: 8px;
+}
+
+.audio-looper > div:nth-child(3) {
+  display: flex;
+  column-gap: 32px;
+  justify-content: center;
+  align-items: center;
+}
+
+.audio-looper > div button {
+  min-width: 32px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.audio-looper > div button:disabled {
+  cursor: not-allowed;
+}
+
+.audio-looper > div:nth-child(2) > progress {
+  width: 256px;
+}
+
+.audio-looper > div:nth-child(3) > div {
+  display: flex;
+  column-gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.audio-looper > div:nth-child(3) > div:last-of-type {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  row-gap: 8px;
+}
+
+
