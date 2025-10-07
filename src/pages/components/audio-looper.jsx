@@ -8,15 +8,13 @@ const messages = {
   es: {
     text: {
       recording: "Grabando",
-      playing: "Reproduciendo",
-      layers: "Capas"
+      playing: "Reproduciendo"
     }
   },
   en: {
     text: {
       recording: "Recording",
-      playing: "Playing",
-      layers: "Layers"
+      playing: "Playing"
     }
   }
 };
@@ -31,6 +29,12 @@ export function AudioLooper() {
   const inputGainNodeRef = useRef(undefined);
   const metronomeGainNodeRef = useRef(undefined);
 
+  const defaultSampleRate = 48000;
+  const defaultBeatsPerMinute = 120;
+  const defaultRecordingDuration = 300;
+  const defaultRecordingGain = 0.8;
+  const defaultMetronomeGain = 0.8;
+
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isRecordingMuted, setIsRecordingMuted] = useState(true);
@@ -42,7 +46,7 @@ export function AudioLooper() {
   const [loopTime, setLoopTime] = useState(0);
   const [loopBeat, setLoopBeat] = useState(0);
 
-  const [beatsPerMinute, setBeatsPerMinute] = useState(120);
+  const [beatsPerMinute, setBeatsPerMinute] = useState(defaultBeatsPerMinute);
   const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(true);
 
   async function initializeAudio() {
@@ -58,7 +62,7 @@ export function AudioLooper() {
     const audioTrackSettings = audioTracks[0].getSettings();
 
     const channelCount = audioTrackSettings.channelCount;
-    const sampleRate = audioTrackSettings.sampleRate ?? 48000;
+    const sampleRate = audioTrackSettings.sampleRate ?? defaultSampleRate;
 
     audioContextRef.current = new AudioContext({
       sampleRate,
@@ -77,7 +81,7 @@ export function AudioLooper() {
         numberOfOutputs: [2],
         outputChannelCount: [channelCount, channelCount],
         processorOptions: {
-          recordingDuration: 300,
+          recordingDuration: defaultRecordingDuration,
           isRecordingMuted,
           beatsPerMinute,
           isMetronomeEnabled
@@ -119,12 +123,12 @@ export function AudioLooper() {
 
     inputGainNodeRef.current = new GainNode(audioContextRef.current, {
       channelCount,
-      gain: 0.8
+      gain: defaultRecordingGain
     });
 
     metronomeGainNodeRef.current = new GainNode(audioContextRef.current, {
       channelCount,
-      gain: 0.8
+      gain: defaultMetronomeGain
     });
 
     inputStreamSourceNodeRef.current.connect(looperWorkletNodeRef.current);
@@ -277,7 +281,7 @@ export function AudioLooper() {
             disabled={!isRecordingAllowed || isRecording}
             onClick={!isPlaying ? startLoop : stopLoop}
           >
-            {String.fromCharCode(!isPlaying ? 9654 : 9632)}
+            {!isPlaying ? <>&#x25b6;</> : <>&#x25a9;</>}
           </button>
         )}
         <progress max={loopDuration} value={loopTime} />
@@ -291,13 +295,13 @@ export function AudioLooper() {
               disabled={!isRecordingAllowed || isRecording || isPlaying}
               onClick={clearLoop}
             >
-              {String.fromCharCode(9851)}
+              &#x267b;
             </button>
             <button
               disabled={!isRecordingAllowed || isRecording || isPlaying || loopLayerCount < 2}
               onClick={removeLastLoopLayer}
             >
-              {String.fromCharCode(11178)}
+              &#x2baa;
             </button>
           </div>
         )}
@@ -306,7 +310,7 @@ export function AudioLooper() {
             disabled={!isRecordingAllowed}
             onClick={!isRecording ? startRecording : stopRecording}
           >
-            {String.fromCharCode(!isRecording ? 9675 : 9679)}
+            {!isRecording ? <>&#x25cb;</> : <>&#x25cf;</>}
           </button>
           <button disabled={!isRecordingAllowed} onClick={toggleRecordingMute}>
             {isRecordingMuted ? <b>M</b> : "M" }
@@ -317,7 +321,7 @@ export function AudioLooper() {
             min="0"
             max="1"
             step="0.01"
-            defaultValue={0.8}
+            defaultValue={defaultRecordingGain}
             onChange={changeRecordingGain}
           />
         </div>
@@ -337,7 +341,7 @@ export function AudioLooper() {
             disabled={!isRecordingAllowed}
             onClick={toggleIsMetronomeEnabled}
           >
-            {isMetronomeEnabled ? <>&#x1F50A;</> : <>&#x1F508;</>}
+            {isMetronomeEnabled ? <>&#x1f50a;</> : <>&#x1f508;</>}
           </button>
           <input
             type="range"
@@ -345,7 +349,7 @@ export function AudioLooper() {
             min="0"
             max="1"
             step="0.01"
-            defaultValue={0.8}
+            defaultValue={defaultMetronomeGain}
             onChange={changeMetronomeGain}
           />
         </div>
