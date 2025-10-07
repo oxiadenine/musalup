@@ -168,6 +168,9 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.loopLayers = [];
 
     this.port.postMessage({ type: "loop-clear" });
+
+    this.isMetronomeEnabled = true;
+
     this.port.postMessage({ type: "loop-beat-update", loopBeat: this.beatCount });
   }
 

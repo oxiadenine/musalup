@@ -108,6 +108,7 @@ export function AudioLooper() {
         setLoopBeat(0);
       } else if (data.type === "loop-clear") {
         setLoopDuration(0);
+        setIsMetronomeEnabled(true);
       } else if (data.type === "loop-layer-add") {
         setLoopLayerCount(data.loopLayerCount);
       } else if (data.type === "loop-layer-remove") {
