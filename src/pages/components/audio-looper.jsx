@@ -29,6 +29,7 @@ export function AudioLooper() {
   const inputStreamSourceNodeRef = useRef(undefined);
   const looperWorkletNodeRef = useRef(undefined);
   const inputGainNodeRef = useRef(undefined);
+  const metronomeGainNodeRef = useRef(undefined);
 
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -41,7 +42,8 @@ export function AudioLooper() {
   const [loopTime, setLoopTime] = useState(0);
   const [loopBeat, setLoopBeat] = useState(0);
 
-  const [tempo, setTempo] = useState(120);
+  const [beatsPerMinute, setBeatsPerMinute] = useState(120);
+  const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(true);
 
   async function initializeAudio() {
     inputStreamRef.current = await getInputStream();
@@ -77,7 +79,8 @@ export function AudioLooper() {
         processorOptions: {
           recordingDuration: 300,
           isRecordingMuted,
-          beatsPerMinute: tempo
+          beatsPerMinute,
+          isMetronomeEnabled
         }
       }
     );
@@ -91,6 +94,7 @@ export function AudioLooper() {
         if (data.loopDuration) {
           setLoopDuration(data.loopDuration);
           setLoopBeatCount(data.loopBeatCount);
+          setIsMetronomeEnabled(false);
         }
       } else if (data.type === "loop-start") {
         setIsPlaying(true);
@@ -108,6 +112,8 @@ export function AudioLooper() {
         setLoopBeat(data.loopBeat);
       } else if (data.type === "loop-time-update") {
         setLoopTime(data.loopTime);
+      } else if (data.type === "metronome-click") {
+        playMetronomeClick();
       }
     };
 
@@ -116,10 +122,16 @@ export function AudioLooper() {
       gain: 0.8
     });
 
+    metronomeGainNodeRef.current = new GainNode(audioContextRef.current, {
+      channelCount,
+      gain: 0.8
+    });
+
     inputStreamSourceNodeRef.current.connect(looperWorkletNodeRef.current);
     looperWorkletNodeRef.current.connect(inputGainNodeRef.current, 0, 0);
     looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 1, 0);
     inputGainNodeRef.current.connect(audioContextRef.current.destination);
+    metronomeGainNodeRef.current.connect(audioContextRef.current.destination);
 
     setIsRecordingAllowed(true);
   }
@@ -141,6 +153,10 @@ export function AudioLooper() {
 
     if (inputGainNodeRef.current) {
       inputGainNodeRef.current.disconnect();
+    }
+
+    if (metronomeGainNodeRef.current) {
+      metronomeGainNodeRef.current.disconnect();
     }
     
     if (audioContextRef.current) {
@@ -187,15 +203,55 @@ export function AudioLooper() {
     looperWorkletNodeRef.current.port.postMessage({ type: "loop-layer-remove" });
   }
 
-  function changeTempo(event) {
-    const tempo = event.target.value;
+  function changeBeatsPerMinute(event) {
+    const beatsPerMinute = event.target.value;
 
     looperWorkletNodeRef.current.port.postMessage({
       type: "loop-bpm-change",
-      beatsPerMinute: tempo
+      beatsPerMinute
     });
 
-    setTempo(tempo);
+    setBeatsPerMinute(beatsPerMinute);
+  }
+
+  function toggleIsMetronomeEnabled() {
+    looperWorkletNodeRef.current.port.postMessage({
+      type: "metronome-enable",
+      isMetronomeEnabled: !isMetronomeEnabled
+    });
+
+    setIsMetronomeEnabled(!isMetronomeEnabled);
+  }
+
+  function changeMetronomeGain(event) {
+    const gain = event.target.value;
+
+    metronomeGainNodeRef.current.gain.setValueAtTime(gain, audioContextRef.current.currentTime);
+  }
+
+  function playMetronomeClick() {
+    const gainNode = new GainNode(audioContextRef.current);
+    const oscillatorNode = new OscillatorNode(audioContextRef.current, { frequency: 1000 });
+      
+    oscillatorNode.connect(gainNode);
+    gainNode.connect(metronomeGainNodeRef.current);
+      
+    const currentTime = audioContextRef.current.currentTime;
+  
+    const attackTime = 0.005;
+    const decayTime = 0.05;
+    const sustainLevel = 0.5;
+    const releaseTime = 0.05;
+  
+    const clickDuration = attackTime + decayTime + releaseTime;
+  
+    gainNode.gain.setValueAtTime(0, currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(1, currentTime + attackTime);
+    gainNode.gain.exponentialRampToValueAtTime(sustainLevel, currentTime + attackTime + decayTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + attackTime + decayTime + releaseTime);
+  
+    oscillatorNode.start(currentTime);
+    oscillatorNode.stop(currentTime + clickDuration);
   }
 
   useEffect(() => {
@@ -272,11 +328,26 @@ export function AudioLooper() {
               type="number"
               disabled={!isRecordingAllowed || isRecording || loopDuration > 0}
               min={30} max={300}
-              value={tempo}
-              onChange={changeTempo}
+              value={beatsPerMinute}
+              onChange={changeBeatsPerMinute}
               onKeyDown={(event) => event.preventDefault()}
             />
           </div>
+          <button
+            disabled={!isRecordingAllowed}
+            onClick={toggleIsMetronomeEnabled}
+          >
+            {isMetronomeEnabled ? <>&#x1F50A;</> : <>&#x1F508;</>}
+          </button>
+          <input
+            type="range"
+            disabled={!isRecordingAllowed}
+            min="0"
+            max="1"
+            step="0.01"
+            defaultValue={0.8}
+            onChange={changeMetronomeGain}
+          />
         </div>
       </div>
     </div>

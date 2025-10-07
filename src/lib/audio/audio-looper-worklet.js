@@ -9,6 +9,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.recordingDuration = processorOptions.recordingDuration;
     this.isRecordingMuted = processorOptions.isRecordingMuted;
     this.beatsPerMinute = processorOptions.beatsPerMinute;
+    this.isMetronomeEnabled = processorOptions.isMetronomeEnabled ?? false;
 
     this.framesPerBeat = Math.ceil(60 / this.beatsPerMinute * sampleRate);
     this.framesPerSubBeat = sampleRate / 30;
@@ -46,6 +47,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         this.clearLoop();
       } else if (data.type === "loop-layer-remove") {
         this.removeLastLoopLayer();
+      } else if (data.type === "metronome-enable") {
+        this.isMetronomeEnabled = data.isMetronomeEnabled;
       }
     }
   }
@@ -59,13 +62,21 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       this.recordingData = new Array(this.channelCount)
         .fill(new Float32Array(this.recordingFrameCount));
 
-      this.port.postMessage({ type: "loop-beat-update", loopBeat: this.beatCount + 1 });
+      this.port.postMessage({
+        type: "loop-beat-update",
+        loopBeat: this.beatCount + 1,
+        isMetronomeEnabled: this.isMetronomeEnabled
+      });
     } else {
       this.recordingData = new Array(this.channelCount)
         .fill(new Float32Array(this.loopFrameCount));
     }
 
     this.port.postMessage({ type: "recording-start" });
+
+    if (this.isMetronomeEnabled) {
+      this.port.postMessage({ type: "metronome-click"});
+    }
 
     if (this.loopLayers.length > 0 && !this.isPlaying) {
       this.isPlaying = true;
@@ -98,10 +109,17 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         loopBeatCount: Math.ceil(this.loopFrameCount / this.framesPerBeat)
       });
 
+      this.isMetronomeEnabled = false;
+
       this.isPlaying = true;
 
       this.port.postMessage({ type: "loop-start" });
-      this.port.postMessage({ type: "loop-beat-update", loopBeat: this.beatCount + 1 });
+
+      this.port.postMessage({
+        type: "loop-beat-update",
+        loopBeat: this.beatCount + 1,
+        isMetronomeEnabled: this.isMetronomeEnabled
+      });
     } else {
       if (!this.isRecordingSilence) {
         this.isRecordingSilence = true;
@@ -163,11 +181,19 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
   }
 
   sendLoopBeat() {
-    this.port.postMessage({ type: "loop-beat-update", loopBeat: this.beatCount + 1 });
+    this.port.postMessage({
+      type: "loop-beat-update",
+      loopBeat: this.beatCount + 1,
+      isMetronomeEnabled: this.isMetronomeEnabled
+    });
   }
 
   sendLoopTime() {
     this.port.postMessage({ type: "loop-time-update", loopTime: this.currentLoopFrame });
+  }
+
+  notifyMetronomeClick() {
+    this.port.postMessage({ type: "metronome-click" });
   }
 
   process(inputs, outputs) {
@@ -231,6 +257,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
         if (currentBeat !== this.beatCount) {
           this.beatCount = currentBeat;
+
+          if (this.isMetronomeEnabled) {
+            this.notifyMetronomeClick();
+          }
         
           this.sendLoopBeat();
         }
@@ -248,6 +278,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
       if (currentBeat !== this.beatCount) {
         this.beatCount = currentBeat;
+
+        if (this.isRecording && this.isMetronomeEnabled) {
+          this.notifyMetronomeClick();
+        }
         
         this.sendLoopBeat();
       }
@@ -273,6 +307,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
             type: "loop-layer-add",
             loopLayerCount: this.loopLayers.length
           });
+        }
+
+        if (this.isRecording && this.isMetronomeEnabled) {
+          this.notifyMetronomeClick();
         }
 
         this.sendLoopTime();
