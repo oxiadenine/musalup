@@ -29,12 +29,12 @@
   display: flex;
   column-gap: 32px;
   justify-content: center;
-  align-items: center;
+  align-items: end;
 }
 
 .audio-looper > div button {
-  min-width: 32px;
-  min-height: 32px;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
 }
 
@@ -48,17 +48,18 @@
 
 .audio-looper > div:nth-child(3) > div {
   display: flex;
+  align-items: end;
   column-gap: 8px;
-  justify-content: center;
-  align-items: center;
 }
 
-.audio-looper > div:nth-child(3) > div:last-of-type {
+.audio-looper > div:nth-child(3) > div:last-of-type > div {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
   row-gap: 8px;
 }
 
-
+.audio-looper > div:nth-child(3) > div > input[type="range"] {
+  height: 42px;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}

@@ -28,6 +28,7 @@ export function AudioLooper() {
   const audioContextRef = useRef(undefined);
   const inputStreamSourceNodeRef = useRef(undefined);
   const looperWorkletNodeRef = useRef(undefined);
+  const inputGainNodeRef = useRef(undefined);
 
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -81,10 +82,6 @@ export function AudioLooper() {
       }
     );
 
-    inputStreamSourceNodeRef.current.connect(looperWorkletNodeRef.current);
-    looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 0, 0);
-    looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 1, 0);
-
     looperWorkletNodeRef.current.port.onmessage = ({ data }) => {
       if (data.type === "recording-start") {
         setIsRecording(true);
@@ -114,6 +111,16 @@ export function AudioLooper() {
       }
     };
 
+    inputGainNodeRef.current = new GainNode(audioContextRef.current, {
+      channelCount,
+      gain: 0.8
+    });
+
+    inputStreamSourceNodeRef.current.connect(looperWorkletNodeRef.current);
+    looperWorkletNodeRef.current.connect(inputGainNodeRef.current, 0, 0);
+    looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 1, 0);
+    inputGainNodeRef.current.connect(audioContextRef.current.destination);
+
     setIsRecordingAllowed(true);
   }
 
@@ -130,6 +137,10 @@ export function AudioLooper() {
 
     if (looperWorkletNodeRef.current) {
       looperWorkletNodeRef.current.disconnect();
+    }
+
+    if (inputGainNodeRef.current) {
+      inputGainNodeRef.current.disconnect();
     }
     
     if (audioContextRef.current) {
@@ -152,6 +163,12 @@ export function AudioLooper() {
     });
 
     setIsRecordingMuted(!isRecordingMuted);
+  }
+
+  function changeRecordingGain(event) {
+    const gain = event.target.value;
+
+    inputGainNodeRef.current.gain.setValueAtTime(gain, audioContextRef.current.currentTime);
   }
 
   function startLoop() {
@@ -238,17 +255,28 @@ export function AudioLooper() {
           <button disabled={!isRecordingAllowed} onClick={toggleRecordingMute}>
             {isRecordingMuted ? <b>M</b> : "M" }
           </button>
+          <input
+            type="range"
+            disabled={!isRecordingAllowed}
+            min="0"
+            max="1"
+            step="0.01"
+            defaultValue={0.8}
+            onChange={changeRecordingGain}
+          />
         </div>
         <div>
-          <h5>Tempo</h5>
-          <input
-            type="number"
-            disabled={!isRecordingAllowed || isRecording || loopDuration > 0}
-            min={30} max={300}
-            value={tempo}
-            onChange={changeTempo}
-            onKeyDown={(event) => event.preventDefault()}
-          />
+          <div>
+            <h5>Tempo</h5>
+            <input
+              type="number"
+              disabled={!isRecordingAllowed || isRecording || loopDuration > 0}
+              min={30} max={300}
+              value={tempo}
+              onChange={changeTempo}
+              onKeyDown={(event) => event.preventDefault()}
+            />
+          </div>
         </div>
       </div>
     </div>
