@@ -52,7 +52,7 @@
   column-gap: 8px;
 }
 
-.audio-looper > div:nth-child(3) > div:last-of-type > div {
+.audio-looper > div:nth-child(3) > div > div {
   display: flex;
   flex-direction: column;
   row-gap: 8px;

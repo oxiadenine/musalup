@@ -19,6 +19,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.isRecording = false;
     this.isPlaying = false;
 
+    this.recordingTriggerSample = 0.05;
     this.recordingFrameCount = 0;
     this.currentRecordingFrame = 0;
     this.isRecordingSilence = true;
@@ -62,11 +63,11 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       this.recordingData = new Array(this.channelCount)
         .fill(new Float32Array(this.recordingFrameCount));
 
-      this.port.postMessage({
-        type: "loop-beat-update",
-        loopBeat: this.beatCount + 1,
-        isMetronomeEnabled: this.isMetronomeEnabled
-      });
+      if (this.isMetronomeEnabled) {
+        this.port.postMessage({ type: "metronome-click"});
+      }
+
+      this.port.postMessage({ type: "loop-beat-update", loopBeat: this.beatCount + 1 });
     } else {
       this.recordingData = new Array(this.channelCount)
         .fill(new Float32Array(this.loopFrameCount));
@@ -74,12 +75,12 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
     this.port.postMessage({ type: "recording-start" });
 
-    if (this.isMetronomeEnabled) {
-      this.port.postMessage({ type: "metronome-click"});
-    }
-
     if (this.loopLayers.length > 0 && !this.isPlaying) {
       this.isPlaying = true;
+
+      if (this.isMetronomeEnabled) {
+        this.port.postMessage({ type: "metronome-click"});
+      }
 
       this.port.postMessage({ type: "loop-start" });
     }
@@ -114,12 +115,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       this.isPlaying = true;
 
       this.port.postMessage({ type: "loop-start" });
-
-      this.port.postMessage({
-        type: "loop-beat-update",
-        loopBeat: this.beatCount + 1,
-        isMetronomeEnabled: this.isMetronomeEnabled
-      });
+      this.port.postMessage({ type: "loop-beat-update", loopBeat: this.beatCount + 1 });
     } else {
       if (!this.isRecordingSilence) {
         this.isRecordingSilence = true;
@@ -184,11 +180,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
   }
 
   sendLoopBeat() {
-    this.port.postMessage({
-      type: "loop-beat-update",
-      loopBeat: this.beatCount + 1,
-      isMetronomeEnabled: this.isMetronomeEnabled
-    });
+    this.port.postMessage({ type: "loop-beat-update", loopBeat: this.beatCount + 1 });
   }
 
   sendLoopTime() {
@@ -218,26 +210,12 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       }
     }
 
-    if (this.loopLayers.length > 0 && this.isPlaying) {
-      for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
-        const loopSampleIndex = sampleIndex + this.currentLoopFrame;
-
-        for (const loopLayer of this.loopLayers) {
-          for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-            loopOutput[channelIndex][sampleIndex] += loopLayer[channelIndex][loopSampleIndex];
-          }
-        }
-      }
-    }
-
     if (this.isRecording) {
-      const sampleTrigger = 0.05;
-      
       for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
         for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
           const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
 
-          if (Math.abs(channel[sampleIndex]) > sampleTrigger) {
+          if (this.isRecordingSilence && Math.abs(channel[sampleIndex]) > this.recordingTriggerSample) {
             this.isRecordingSilence = false;
           }
 
@@ -252,32 +230,30 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
           }
         }
       }
-
+      
       if (this.loopLayers.length === 0) {
         this.currentRecordingFrame += frameBufferSize;
-
-        const currentBeat = Math.floor(this.currentRecordingFrame / this.framesPerBeat);
-
-        if (currentBeat !== this.beatCount) {
-          this.beatCount = currentBeat;
-
-          if (this.isMetronomeEnabled) {
-            this.notifyMetronomeClick();
-          }
-        
-          this.sendLoopBeat();
-        }
-
-        if (this.currentRecordingFrame === this.recordingFrameCount) {
-          this.stopRecording();
-        }
       }
     }
 
-    if (this.loopLayers.length > 0 && this.isPlaying) {
-      this.currentLoopFrame += frameBufferSize;
+    if (this.isPlaying) {
+      for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+        const loopSampleIndex = sampleIndex + this.currentLoopFrame;
 
-      const currentBeat = Math.floor(this.currentLoopFrame / this.framesPerBeat);
+        for (const loopLayer of this.loopLayers) {
+          for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+            loopOutput[channelIndex][sampleIndex] += loopLayer[channelIndex][loopSampleIndex];
+          }
+        }
+      }
+
+      this.currentLoopFrame += frameBufferSize;
+    }
+
+    if (this.isRecording || this.isPlaying) {
+      const currentBeat = this.loopLayers.length === 0
+        ? Math.floor(this.currentRecordingFrame / this.framesPerBeat)
+        : Math.floor(this.currentLoopFrame / this.framesPerBeat);
 
       if (currentBeat !== this.beatCount) {
         this.beatCount = currentBeat;
@@ -285,35 +261,47 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         if (this.isRecording && this.isMetronomeEnabled) {
           this.notifyMetronomeClick();
         }
-        
+          
         this.sendLoopBeat();
       }
 
-      const currentSubBeat = Math.floor(this.currentLoopFrame / this.framesPerSubBeat);
+      if (this.isPlaying && this.loopLayers.length > 0) {
+        const currentSubBeat = Math.floor(this.currentLoopFrame / this.framesPerSubBeat);
 
-      if (currentSubBeat !== this.subBeatCount) {
-        this.subBeatCount = currentSubBeat;
+        if (currentSubBeat !== this.subBeatCount) {
+          this.subBeatCount = currentSubBeat;
 
-        this.sendLoopTime();
-      }
-
-      if (this.currentLoopFrame === this.loopFrameCount) {
-        if (this.isRecording && !this.isRecordingSilence) {
-          this.isRecordingSilence = true;
-
-          this.loopLayers.push(this.recordingData);
-
-          this.recordingData = new Array(this.channelCount)
-            .fill(new Float32Array(this.loopFrameCount));
-
-          this.port.postMessage({
-            type: "loop-layer-add",
-            loopLayerCount: this.loopLayers.length
-          });
+          this.sendLoopTime();
         }
+      }
+    }
 
-        if (this.isRecording && this.isMetronomeEnabled) {
-          this.notifyMetronomeClick();
+    if (this.isRecording && this.loopLayers.length === 0) {
+      if (this.currentRecordingFrame === this.recordingFrameCount) {
+        this.stopRecording();
+      }
+    }
+
+    if (this.isPlaying && this.loopLayers.length > 0) {
+      if (this.currentLoopFrame === this.loopFrameCount) {
+        if (this.isRecording) {
+          if (this.isMetronomeEnabled) {
+            this.notifyMetronomeClick();
+          }
+
+          if (!this.isRecordingSilence) {
+            this.isRecordingSilence = true;
+
+            this.loopLayers.push(this.recordingData);
+
+            this.recordingData = new Array(this.channelCount)
+              .fill(new Float32Array(this.loopFrameCount));
+
+            this.port.postMessage({
+              type: "loop-layer-add",
+              loopLayerCount: this.loopLayers.length
+            });
+          }
         }
 
         this.sendLoopTime();

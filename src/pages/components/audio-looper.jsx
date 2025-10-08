@@ -8,13 +8,15 @@ const messages = {
   es: {
     text: {
       recording: "Grabando",
-      playing: "Reproduciendo"
+      playing: "Reproduciendo",
+      bpm: "PPM"
     }
   },
   en: {
     text: {
       recording: "Recording",
-      playing: "Playing"
+      playing: "Playing",
+      bpm:"BPM"
     }
   }
 };
@@ -221,7 +223,7 @@ export function AudioLooper() {
     setBeatsPerMinute(beatsPerMinute);
   }
 
-  function toggleIsMetronomeEnabled() {
+  function toggleMetronomeEnable() {
     looperWorkletNodeRef.current.port.postMessage({
       type: "metronome-enable",
       isMetronomeEnabled: !isMetronomeEnabled
@@ -371,20 +373,21 @@ export function AudioLooper() {
           <input
             type="range"
             disabled={!isRecordingAllowed}
-            min="0"
-            max="1"
-            step="0.01"
+            min={0}
+            max={1}
+            step={0.05}
             defaultValue={defaultRecordingGain}
             onChange={changeRecordingGain}
           />
         </div>
         <div>
           <div>
-            <h5>Tempo</h5>
+            <h5>{translate("audio-looper:text.bpm")}</h5>
             <input
               type="number"
               disabled={!isRecordingAllowed || isRecording || loopDuration > 0}
-              min={30} max={300}
+              min={30}
+              max={300}
               value={beatsPerMinute}
               onChange={changeBeatsPerMinute}
               onKeyDown={(event) => event.preventDefault()}
@@ -392,16 +395,16 @@ export function AudioLooper() {
           </div>
           <button
             disabled={!isRecordingAllowed}
-            onClick={toggleIsMetronomeEnabled}
+            onClick={toggleMetronomeEnable}
           >
             {isMetronomeEnabled ? <>&#x1f50a;</> : <>&#x1f508;</>}
           </button>
           <input
             type="range"
             disabled={!isRecordingAllowed}
-            min="0"
-            max="1"
-            step="0.01"
+            min={0}
+            max={1}
+            step={0.05}
             defaultValue={defaultMetronomeGain}
             onChange={changeMetronomeGain}
           />
