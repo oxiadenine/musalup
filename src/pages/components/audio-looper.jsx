@@ -49,6 +49,8 @@ export function AudioLooper() {
   const [beatsPerMinute, setBeatsPerMinute] = useState(defaultBeatsPerMinute);
   const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(true);
 
+  const handleKeyEventRef = useRef(handleKeyEvent);
+
   async function initializeAudio() {
     inputStreamRef.current = await getInputStream();
 
@@ -259,11 +261,61 @@ export function AudioLooper() {
     oscillatorNode.stop(currentTime + clickDuration);
   }
 
+  function handleKeyEvent(event) {
+    event.preventDefault();
+
+    if (!isRecordingAllowed) {
+      return;
+    }
+
+    if (event.code === "Space") {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    }
+
+    if (isRecording || loopDuration === 0) {
+      return;
+    }
+    
+    if (event.code === "Enter") {
+      if (isPlaying) {
+        stopLoop();
+      } else {
+        startLoop();
+      }
+    } else if (event.code === "Backspace" && event.shiftKey) {
+      if (!isPlaying) {
+        clearLoop();
+      }
+    } else if (event.code === "Backspace") {
+      if (!isPlaying && loopLayerCount > 1) {
+        removeLastLoopLayer();
+      }
+    }
+  }
+
   useEffect(() => {
     initializeAudio();
 
     return () => {
       freeAudioResources();
+    };
+  }, []);
+
+  useEffect(() => {
+    handleKeyEventRef.current = handleKeyEvent;
+  }, [isRecordingAllowed, isRecording, isPlaying, loopDuration, loopLayerCount]);
+
+  useEffect(() => {
+    const handleKeyEvent = (event) => handleKeyEventRef.current(event);
+
+    document.addEventListener("keydown", handleKeyEvent);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyEvent);
     };
   }, []);
 
