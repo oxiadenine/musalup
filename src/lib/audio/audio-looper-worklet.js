@@ -8,6 +8,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
     this.recordingDuration = processorOptions.recordingDuration;
     this.isRecordingMuted = processorOptions.isRecordingMuted;
+    this.recordingSilenceLevel = processorOptions.recordingSilenceLevel;
     this.beatsPerMinute = processorOptions.beatsPerMinute;
     this.isMetronomeEnabled = processorOptions.isMetronomeEnabled ?? false;
 
@@ -19,7 +20,6 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.isRecording = false;
     this.isPlaying = false;
 
-    this.recordingTriggerSample = 0.05;
     this.recordingFrameCount = 0;
     this.currentRecordingFrame = 0;
     this.isRecordingSilence = true;
@@ -36,6 +36,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         this.stopRecording();
       } else if (data.type === "recording-mute") {
         this.isRecordingMuted = data.isRecordingMuted;
+      } else if (data.type === "recording-silence-level-change") {
+        this.recordingSilenceLevel = data.recordingSilenceLevel;
       } else if (data.type === "loop-bpm-change") {
         this.beatsPerMinute = Math.max(30, Math.min(300, data.beatsPerMinute));
 
@@ -211,22 +213,42 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     }
 
     if (this.isRecording) {
+      if (this.isRecordingSilence && this.loopLayers.length > 0) {
+        let recordingInputPeak = 0;
+
+        for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+          const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
+
+          let recordingSampleSquareSum = 0;
+
+          for (let sampleIndex = 0; sampleIndex < channel.length; sampleIndex++) {
+            recordingSampleSquareSum += channel[sampleIndex] * channel[sampleIndex];
+          }
+
+          recordingInputPeak += Math.sqrt(recordingSampleSquareSum / channel.length);
+        }
+
+        recordingInputPeak / recordingInput.length;
+
+        if (recordingInputPeak > this.recordingSilenceLevel) {
+          this.isRecordingSilence = false;
+        }
+      }
+
       for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
         for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
           const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
 
-          if (this.isRecordingSilence && Math.abs(channel[sampleIndex]) > this.recordingTriggerSample) {
-            this.isRecordingSilence = false;
-          }
-
           if (this.loopLayers.length === 0) {
             const recordingSampleIndex = sampleIndex + this.currentRecordingFrame;
-
+            
             this.recordingData[channelIndex][recordingSampleIndex] = channel[sampleIndex];
           } else {
-            const recordingSampleIndex = sampleIndex + this.currentLoopFrame;
+            if (!this.isRecordingSilence) {
+              const recordingSampleIndex = sampleIndex + this.currentLoopFrame;
 
-            this.recordingData[channelIndex][recordingSampleIndex] = channel[sampleIndex];
+              this.recordingData[channelIndex][recordingSampleIndex] = channel[sampleIndex];
+            }
           }
         }
       }

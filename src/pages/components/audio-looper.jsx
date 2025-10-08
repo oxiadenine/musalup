@@ -9,6 +9,7 @@ const messages = {
     text: {
       recording: "Grabando",
       playing: "Reproduciendo",
+      rsl: "NSG",
       bpm: "PPM"
     }
   },
@@ -16,7 +17,8 @@ const messages = {
     text: {
       recording: "Recording",
       playing: "Playing",
-      bpm:"BPM"
+      rsl: "RSL",
+      bpm: "BPM"
     }
   }
 };
@@ -32,15 +34,18 @@ export function AudioLooper() {
   const metronomeGainNodeRef = useRef(undefined);
 
   const defaultSampleRate = 48000;
-  const defaultBeatsPerMinute = 120;
   const defaultRecordingDuration = 300;
   const defaultRecordingGain = 0.8;
+  const defaultRecordingSilenceLevel = 0.05;
+  const defaultBeatsPerMinute = 120;
   const defaultMetronomeGain = 0.8;
 
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isRecordingMuted, setIsRecordingMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  const [recordingSilenceLevel, setRecordingSilenceLevel] = useState(defaultRecordingSilenceLevel);
 
   const [loopDuration, setLoopDuration] = useState(0);
   const [loopBeatCount, setLoopBeatCount] = useState(0);
@@ -87,6 +92,7 @@ export function AudioLooper() {
         processorOptions: {
           recordingDuration: defaultRecordingDuration,
           isRecordingMuted,
+          recordingSilenceLevel: defaultRecordingSilenceLevel,
           beatsPerMinute,
           isMetronomeEnabled
         }
@@ -194,6 +200,17 @@ export function AudioLooper() {
     const gain = event.target.value;
 
     inputGainNodeRef.current.gain.setValueAtTime(gain, audioContextRef.current.currentTime);
+  }
+
+  function changeRecordingSilenceLevel(event) {
+    const recordingSilenceLevel = event.target.value;
+
+    looperWorkletNodeRef.current.port.postMessage({
+      type: "recording-silence-level-change",
+      recordingSilenceLevel
+    });
+
+    setRecordingSilenceLevel(recordingSilenceLevel);
   }
 
   function startLoop() {
@@ -379,6 +396,19 @@ export function AudioLooper() {
             defaultValue={defaultRecordingGain}
             onChange={changeRecordingGain}
           />
+          <div>
+            <h5>{translate("audio-looper:text.rsl")}</h5>
+            <input
+              type="number"
+              disabled={!isRecordingAllowed || isRecording}
+              min={0}
+              max={0.5}
+              step={0.001}
+              value={recordingSilenceLevel}
+              onChange={changeRecordingSilenceLevel}
+              onKeyDown={(event) => event.preventDefault()}
+            />
+          </div>
         </div>
         <div>
           <div>
