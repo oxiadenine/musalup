@@ -311,14 +311,22 @@ export function AudioLooper() {
     }
 
     if (event.code === "Space") {
-      if (isRecording) {
-        stopRecording();
+      if (isRecordingWaitEnabled) {
+        if (!isRecording && !isRecordingWaiting) {
+          waitRecording();
+        } else {
+          stopRecording();
+        }
       } else {
-        startRecording();
+        if (!isRecording) {
+          startRecording()
+        } else {
+          stopRecording();
+        }
       }
     }
 
-    if (isRecording || loopDuration === 0) {
+    if (isRecording || isRecordingWaiting || loopDuration === 0) {
       return;
     }
     
@@ -349,7 +357,15 @@ export function AudioLooper() {
 
   useEffect(() => {
     handleKeyEventRef.current = handleKeyEvent;
-  }, [isRecordingAllowed, isRecording, isRecordingWaiting, isPlaying, loopDuration, loopLayerCount]);
+  }, [
+    isRecordingAllowed,
+    isRecordingWaitEnabled,
+    isRecording,
+    isRecordingWaiting,
+    isPlaying,
+    loopDuration,
+    loopLayerCount
+  ]);
 
   useEffect(() => {
     const handleKeyEvent = (event) => handleKeyEventRef.current(event);
@@ -406,7 +422,7 @@ export function AudioLooper() {
             disabled={!isRecordingAllowed}
             onClick={isRecordingWaitEnabled
               ? !isRecording && !isRecordingWaiting ? waitRecording : stopRecording
-              : !isRecording ? startRecording : stopRecording 
+              : !isRecording ? startRecording : stopRecording
             }
           >
             {isRecordingWaitEnabled 
