@@ -288,13 +288,12 @@ export function AudioLooper() {
     const currentTime = audioContextRef.current.currentTime;
   
     const attackTime = 0.005;
-    const decayTime = 0.05;
-    const sustainLevel = 0.5;
+    const decayTime = 0.025;
+    const sustainLevel = 0.75;
     const releaseTime = 0.05;
   
     const clickDuration = attackTime + decayTime + releaseTime;
   
-    gainNode.gain.setValueAtTime(0, currentTime);
     gainNode.gain.exponentialRampToValueAtTime(1, currentTime + attackTime);
     gainNode.gain.exponentialRampToValueAtTime(sustainLevel, currentTime + attackTime + decayTime);
     gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + attackTime + decayTime + releaseTime);
