@@ -8,6 +8,7 @@ const messages = {
   es: {
     text: {
       recording: "Grabando",
+      waiting: "Esperando",
       playing: "Reproduciendo",
       rsl: "NSG",
       bpm: "PPM"
@@ -16,6 +17,7 @@ const messages = {
   en: {
     text: {
       recording: "Recording",
+      waiting: "Waiting",
       playing: "Playing",
       rsl: "RSL",
       bpm: "BPM"
@@ -42,9 +44,11 @@ export function AudioLooper() {
 
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [isRecordingMuted, setIsRecordingMuted] = useState(true);
+  const [isRecordingWaiting, setIsRecordingWaiting] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  const [isRecordingMuted, setIsRecordingMuted] = useState(true);
+  const [isRecordingWaitEnabled, setIsRecordingWaitEnabled] = useState(true);
   const [recordingSilenceLevel, setRecordingSilenceLevel] = useState(defaultRecordingSilenceLevel);
 
   const [loopDuration, setLoopDuration] = useState(0);
@@ -92,6 +96,7 @@ export function AudioLooper() {
         processorOptions: {
           recordingDuration: defaultRecordingDuration,
           isRecordingMuted,
+          isRecordingWaitEnabled,
           recordingSilenceLevel: defaultRecordingSilenceLevel,
           beatsPerMinute,
           isMetronomeEnabled
@@ -102,8 +107,12 @@ export function AudioLooper() {
     looperWorkletNodeRef.current.port.onmessage = ({ data }) => {
       if (data.type === "recording-start") {
         setIsRecording(true);
+        setIsRecordingWaiting(false);
+      } if (data.type === "recording-wait") {
+        setIsRecordingWaiting(true);
       } else if (data.type === "recording-stop") {
         setIsRecording(false);
+        setIsRecordingWaiting(false);
 
         if (data.loopDuration) {
           setLoopDuration(data.loopDuration);
@@ -118,6 +127,7 @@ export function AudioLooper() {
         setLoopBeat(0);
       } else if (data.type === "loop-clear") {
         setLoopDuration(0);
+        setLoopLayerCount(0);
         setIsMetronomeEnabled(true);
       } else if (data.type === "loop-layer-add") {
         setLoopLayerCount(data.loopLayerCount);
@@ -183,6 +193,10 @@ export function AudioLooper() {
     looperWorkletNodeRef.current.port.postMessage({ type: "recording-start" });
   }
 
+  function waitRecording() {
+    looperWorkletNodeRef.current.port.postMessage({ type: "recording-wait" });
+  }
+
   function stopRecording() {
     looperWorkletNodeRef.current.port.postMessage({ type: "recording-stop" });
   }
@@ -200,6 +214,15 @@ export function AudioLooper() {
     const gain = event.target.value;
 
     inputGainNodeRef.current.gain.setValueAtTime(gain, audioContextRef.current.currentTime);
+  }
+
+  function toggleRecordingWaitEnable() {
+    looperWorkletNodeRef.current.port.postMessage({
+      type: "recording-wait-enable",
+      isRecordingWaitEnabled: !isRecordingWaitEnabled
+    });
+
+    setIsRecordingWaitEnabled(!isRecordingWaitEnabled);
   }
 
   function changeRecordingSilenceLevel(event) {
@@ -326,7 +349,7 @@ export function AudioLooper() {
 
   useEffect(() => {
     handleKeyEventRef.current = handleKeyEvent;
-  }, [isRecordingAllowed, isRecording, isPlaying, loopDuration, loopLayerCount]);
+  }, [isRecordingAllowed, isRecording, isRecordingWaiting, isPlaying, loopDuration, loopLayerCount]);
 
   useEffect(() => {
     const handleKeyEvent = (event) => handleKeyEventRef.current(event);
@@ -343,14 +366,15 @@ export function AudioLooper() {
       <div>
         <h3>Looper</h3>
         <h5>
-          {isRecording && translate("audio-looper:text.recording")}
-          {isPlaying && !isRecording && translate("audio-looper:text.playing")}
+          {isRecording && !isRecordingWaiting && translate("audio-looper:text.recording")}
+          {!isRecording && isRecordingWaiting && translate("audio-looper:text.waiting")}
+          {!isRecording && !isRecordingWaiting && isPlaying && translate("audio-looper:text.playing")}
         </h5>
       </div>
       <div>
         {loopDuration > 0 && (
           <button
-            disabled={!isRecordingAllowed || isRecording}
+            disabled={!isRecordingAllowed || isRecording || isRecordingWaiting}
             onClick={!isPlaying ? startLoop : stopLoop}
           >
             {!isPlaying ? <>&#x25b6;</> : <>&#x25a9;</>}
@@ -380,9 +404,15 @@ export function AudioLooper() {
         <div>
           <button
             disabled={!isRecordingAllowed}
-            onClick={!isRecording ? startRecording : stopRecording}
+            onClick={isRecordingWaitEnabled
+              ? !isRecording && !isRecordingWaiting ? waitRecording : stopRecording
+              : !isRecording ? startRecording : stopRecording 
+            }
           >
-            {!isRecording ? <>&#x25cb;</> : <>&#x25cf;</>}
+            {isRecordingWaitEnabled 
+              ? !isRecording && !isRecordingWaiting ? <>&#x25cb;</> : <>&#x25cf;</>
+              : !isRecording ? <>&#x25cb;</> : <>&#x25cf;</>
+            }
           </button>
           <button disabled={!isRecordingAllowed} onClick={toggleRecordingMute}>
             {isRecordingMuted ? <b>M</b> : "M" }
@@ -396,6 +426,12 @@ export function AudioLooper() {
             defaultValue={defaultRecordingGain}
             onChange={changeRecordingGain}
           />
+          <button
+            disabled={!isRecordingAllowed || isRecording}
+            onClick={toggleRecordingWaitEnable}
+          >
+            {isRecordingWaitEnabled ? <b>&#x23f1;</b> : <>&#x23f1;</>}
+          </button>
           <div>
             <h5>{translate("audio-looper:text.rsl")}</h5>
             <input
