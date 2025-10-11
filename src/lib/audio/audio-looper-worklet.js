@@ -268,7 +268,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       }
 
       if (this.isRecordingSilence) {
-        let recordingInputPeak = 0;
+        let recordingInputLoudness = 0;
 
         for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
           const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
@@ -279,12 +279,12 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
             recordingSampleSquareSum += channel[sampleIndex] * channel[sampleIndex];
           }
 
-          recordingInputPeak += Math.sqrt(recordingSampleSquareSum / channel.length);
+          recordingInputLoudness += recordingSampleSquareSum;
         }
 
-        recordingInputPeak / recordingInput.length;
+        recordingInputLoudness = Math.sqrt(recordingInputLoudness / (this.channelCount * frameBufferSize));
 
-        if (recordingInputPeak > this.recordingSilenceLevel) {
+        if (recordingInputLoudness > this.recordingSilenceLevel) {
           this.isRecordingSilence = false;
 
           if (!this.isPlaying) {
