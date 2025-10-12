@@ -414,13 +414,15 @@ export function AudioLooper() {
         {loopLayerCount > 0 && (
           <div>
             <button
-              disabled={!isRecordingAllowed || isRecording || isPlaying || loopLayerCount <= 1}
+              disabled={!isRecordingAllowed || isRecording || isRecordingWaiting 
+                || isPlaying || loopLayerCount <= 1
+              }
               onClick={removeLastLoopLayer}
             >
               &#x2baa;
             </button>
             <button
-              disabled={!isRecordingAllowed || isRecording || isPlaying}
+              disabled={!isRecordingAllowed || isRecording || isRecordingWaiting || isPlaying}
               onClick={clearLoop}
             >
               &#x267b;
@@ -443,7 +445,9 @@ export function AudioLooper() {
             <h5>{translate("audio-looper:text.bpm")}</h5>
             <input
               type="number"
-              disabled={!isRecordingAllowed || isRecording || loopLayerCount > 0}
+              disabled={!isRecordingAllowed || isRecording || isRecordingWaiting 
+                || loopLayerCount > 0
+              }
               min={30}
               max={300}
               value={beatsPerMinute}
@@ -478,7 +482,7 @@ export function AudioLooper() {
             onChange={changeRecordingMonitoringGain}
           />
           <button
-            disabled={!isRecordingAllowed || isRecording}
+            disabled={!isRecordingAllowed || isRecording || isRecordingWaiting}
             onClick={toggleRecordingWaitEnable}
           >
             {isRecordingWaitEnabled ? <b>&#x23f1;</b> : <>&#x23f1;</>}
