@@ -32,7 +32,6 @@ export function AudioLooper() {
   const audioContextRef = useRef(undefined);
   const inputStreamSourceNodeRef = useRef(undefined);
   const looperWorkletNodeRef = useRef(undefined);
-  const inputGainNodeRef = useRef(undefined);
   const metronomeGainNodeRef = useRef(undefined);
 
   const defaultSampleRate = 48000;
@@ -49,6 +48,7 @@ export function AudioLooper() {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const [isRecordingMonitoringMuted, setIsRecordingMonitoringMuted] = useState(true);
+  const [recordingMonitoringGain, setRecordingMonitoringGain] = useState(defaultRecordingMonitoringGain);
   const [isRecordingWaitEnabled, setIsRecordingWaitEnabled] = useState(true);
   const [recordingSilenceLevel, setRecordingSilenceLevel] = useState(defaultRecordingSilenceLevel);
 
@@ -99,6 +99,7 @@ export function AudioLooper() {
         processorOptions: {
           recordingDuration: defaultRecordingDuration,
           isRecordingMonitoringMuted,
+          recordingMonitoringGain,
           isRecordingWaitEnabled,
           recordingSilenceLevel: Math.pow(10, defaultRecordingSilenceLevel / 20),
           loopGain,
@@ -146,20 +147,14 @@ export function AudioLooper() {
       }
     };
 
-    inputGainNodeRef.current = new GainNode(audioContextRef.current, {
-      channelCount,
-      gain: defaultRecordingMonitoringGain
-    });
-
     metronomeGainNodeRef.current = new GainNode(audioContextRef.current, {
       channelCount,
       gain: defaultMetronomeGain
     });
 
     inputStreamSourceNodeRef.current.connect(looperWorkletNodeRef.current);
-    looperWorkletNodeRef.current.connect(inputGainNodeRef.current, 0, 0);
+    looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 0, 0);
     looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 1, 0);
-    inputGainNodeRef.current.connect(audioContextRef.current.destination);
     metronomeGainNodeRef.current.connect(audioContextRef.current.destination);
 
     setIsRecordingAllowed(true);
@@ -178,10 +173,6 @@ export function AudioLooper() {
 
     if (looperWorkletNodeRef.current) {
       looperWorkletNodeRef.current.disconnect();
-    }
-
-    if (inputGainNodeRef.current) {
-      inputGainNodeRef.current.disconnect();
     }
 
     if (metronomeGainNodeRef.current) {
@@ -215,9 +206,14 @@ export function AudioLooper() {
   }
 
   function changeRecordingMonitoringGain(event) {
-    const gain = event.target.value;
+    const recordingMonitoringGain = event.target.value;
 
-    inputGainNodeRef.current.gain.setValueAtTime(gain, audioContextRef.current.currentTime);
+    looperWorkletNodeRef.current.port.postMessage({
+      type: "recording-monitoring-gain-change",
+      recordingMonitoringGain
+    });
+
+    setRecordingMonitoringGain(recordingMonitoringGain);
   }
 
   function toggleRecordingWaitEnable() {

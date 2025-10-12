@@ -8,6 +8,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
     this.recordingDuration = processorOptions.recordingDuration;
     this.isRecordingMonitoringMuted = processorOptions.isRecordingMonitoringMuted;
+    this.recordingMonitoringGain = processorOptions.recordingMonitoringGain;
     this.isRecordingWaitEnabled = processorOptions.isRecordingWaitEnabled ?? false;
     this.recordingSilenceLevel = processorOptions.recordingSilenceLevel;
     this.loopGain = processorOptions.loopGain;
@@ -54,6 +55,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       this.stopRecording();
     } else if (data.type === "recording-monitoring-mute-enable") {
       this.isRecordingMonitoringMuted = data.isRecordingMonitoringMuted;
+    } else if (data.type === "recording-monitoring-gain-change") {
+      this.recordingMonitoringGain = data.recordingMonitoringGain;
     } else if (data.type === "recording-wait-enable") {
       this.isRecordingWaitEnabled = data.isRecordingWaitEnabled;
 
@@ -263,11 +266,13 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     }
   }
 
-  processRecordingMonitoring(input, output, isInputMono) {
-    for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-      const channel = isInputMono ? input[0] : input[channelIndex];
+  processRecordingMonitoring(input, output, isInputMono, frameBufferSize) {
+    for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+      for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+        const channel = isInputMono ? input[0] : input[channelIndex];
 
-      output[channelIndex].set(channel);
+        output[channelIndex][sampleIndex] = channel[sampleIndex] * this.recordingMonitoringGain;
+      }
     }
   }
 
@@ -361,7 +366,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     const isInputMono = channelCount === 1;
 
     if (this.isRecording && !this.isRecordingMonitoringMuted) {
-      this.processRecordingMonitoring(recordingInput, recordingOutput, isInputMono);
+      this.processRecordingMonitoring(recordingInput, recordingOutput, isInputMono, frameBufferSize);
     }
 
     if (this.isRecording) {
