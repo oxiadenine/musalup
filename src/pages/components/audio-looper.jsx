@@ -40,7 +40,7 @@ export function AudioLooper() {
   const defaultRecordingMonitoringGain = 0.8;
   const defaultRecordingSilenceLevel = -32 // dBFS;
   const defaultLoopGain = Math.pow(10, -4 / 20); // -4 dBFS
-  const defaultBeatsPerMinute = 120;
+  const defaultLoopBeatsPerMinute = 120;
   const defaultMetronomeGain = 0.8;
 
   const [isRecordingAllowed, setIsRecordingAllowed] = useState(false);
@@ -53,13 +53,14 @@ export function AudioLooper() {
   const [recordingSilenceLevel, setRecordingSilenceLevel] = useState(defaultRecordingSilenceLevel);
 
   const [loopGain, setLoopGain] = useState(defaultLoopGain);
+  const [loopBeatsPerMinute, setLoopBeatsPerMinute] = useState(defaultLoopBeatsPerMinute);
+
+  const [loopLayerCount, setLoopLayerCount] = useState(0);
   const [loopDuration, setLoopDuration] = useState(0);
   const [loopBeatCount, setLoopBeatCount] = useState(0);
-  const [loopLayerCount, setLoopLayerCount] = useState(0);
   const [loopTime, setLoopTime] = useState(0);
   const [loopBeat, setLoopBeat] = useState(0);
 
-  const [beatsPerMinute, setBeatsPerMinute] = useState(defaultBeatsPerMinute);
   const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(true);
 
   const handleKeyEventRef = useRef(handleKeyEvent);
@@ -101,7 +102,7 @@ export function AudioLooper() {
           isRecordingWaitEnabled,
           recordingSilenceLevel: Math.pow(10, defaultRecordingSilenceLevel / 20),
           loopGain,
-          beatsPerMinute,
+          loopBeatsPerMinute,
           isMetronomeEnabled
         }
       }
@@ -206,7 +207,7 @@ export function AudioLooper() {
 
   function toggleRecordingMonitoringMute() {
     looperWorkletNodeRef.current.port.postMessage({
-      type: "recording-monitoring-mute",
+      type: "recording-monitoring-mute-enable",
       isRecordingMonitoringMuted: !isRecordingMonitoringMuted
     });
 
@@ -239,14 +240,6 @@ export function AudioLooper() {
     setRecordingSilenceLevel(recordingSilenceLevel);
   }
 
-  function startLoop() {
-    looperWorkletNodeRef.current.port.postMessage({ type: "loop-start" });
-  }
-
-  function stopLoop() {
-    looperWorkletNodeRef.current.port.postMessage({ type: "loop-stop" });
-  }
-
   function changeLoopGain(event) {
     const loopGain = event.target.value;
 
@@ -258,23 +251,31 @@ export function AudioLooper() {
     setLoopGain(loopGain);
   }
 
+  function changeLoopBeatsPerMinute(event) {
+    const loopBeatsPerMinute = event.target.value;
+
+    looperWorkletNodeRef.current.port.postMessage({
+      type: "loop-bpm-change",
+      loopBeatsPerMinute
+    });
+
+    setLoopBeatsPerMinute(loopBeatsPerMinute);
+  }
+
+  function startLoop() {
+    looperWorkletNodeRef.current.port.postMessage({ type: "loop-start" });
+  }
+
+  function stopLoop() {
+    looperWorkletNodeRef.current.port.postMessage({ type: "loop-stop" });
+  }
+
   function clearLoop() {
     looperWorkletNodeRef.current.port.postMessage({ type: "loop-clear" });
   }
 
-  function removeLastLoopLayer() {
+  function removeLoopLayer() {
     looperWorkletNodeRef.current.port.postMessage({ type: "loop-layer-remove" });
-  }
-
-  function changeBeatsPerMinute(event) {
-    const beatsPerMinute = event.target.value;
-
-    looperWorkletNodeRef.current.port.postMessage({
-      type: "loop-bpm-change",
-      beatsPerMinute
-    });
-
-    setBeatsPerMinute(beatsPerMinute);
   }
 
   function toggleMetronomeEnable() {
@@ -355,7 +356,7 @@ export function AudioLooper() {
       }
     } else if (event.code === "Backspace") {
       if (!isPlaying && loopLayerCount > 1) {
-        removeLastLoopLayer();
+        removeLoopLayer();
       }
     }
   }
@@ -417,7 +418,7 @@ export function AudioLooper() {
               disabled={!isRecordingAllowed || isRecording || isRecordingWaiting 
                 || isPlaying || loopLayerCount <= 1
               }
-              onClick={removeLastLoopLayer}
+              onClick={removeLoopLayer}
             >
               &#x2baa;
             </button>
@@ -450,8 +451,8 @@ export function AudioLooper() {
               }
               min={30}
               max={300}
-              value={beatsPerMinute}
-              onChange={changeBeatsPerMinute}
+              value={loopBeatsPerMinute}
+              onChange={changeLoopBeatsPerMinute}
               onKeyDown={(event) => event.preventDefault()}
             />
           </div>

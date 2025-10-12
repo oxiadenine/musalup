@@ -11,12 +11,12 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.isRecordingWaitEnabled = processorOptions.isRecordingWaitEnabled ?? false;
     this.recordingSilenceLevel = processorOptions.recordingSilenceLevel;
     this.loopGain = processorOptions.loopGain;
-    this.beatsPerMinute = processorOptions.beatsPerMinute;
+    this.loopBeatsPerMinute = processorOptions.loopBeatsPerMinute;
     this.isMetronomeEnabled = processorOptions.isMetronomeEnabled ?? false;
 
     this.isRecordingSilence = this.isRecordingWaitEnabled ? true : false;
 
-    this.framesPerBeat = Math.ceil(60 / this.beatsPerMinute * sampleRate);
+    this.framesPerBeat = Math.ceil(60 / this.loopBeatsPerMinute * sampleRate);
     this.framesPerSubBeat = sampleRate / 30;
 
     this.currentBeat = 0;
@@ -40,38 +40,42 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.compressionThreshold = Math.pow(10, -2 / 20); // -2 dBFS
     this.compressionLimit = 0.95;
 
-    this.port.onmessage = ({ data }) => {
-      if (data.type === "recording-start") {
-        this.startRecording();
-      } else if (data.type === "recording-wait") {
-        this.waitRecording();
-      } else if (data.type === "recording-stop") {
-        this.stopRecording();
-      } else if (data.type === "recording-monitoring-mute") {
-        this.isRecordingMonitoringMuted = data.isRecordingMonitoringMuted;
-      } else if (data.type === "recording-wait-enable") {
-        this.isRecordingWaitEnabled = data.isRecordingWaitEnabled;
+    this.port.onmessage = this.handleMessage.bind(this);
+  }
 
-        this.isRecordingSilence = this.isRecordingWaitEnabled ? true : false;
-      } else if (data.type === "recording-silence-level-change") {
-        this.recordingSilenceLevel = data.recordingSilenceLevel;
-      } else if (data.type === "loop-gain-change") {
-        this.loopGain = data.loopGain;
-      } else if (data.type === "loop-bpm-change") {
-        this.beatsPerMinute = Math.max(30, Math.min(300, data.beatsPerMinute));
+  handleMessage(event) {
+    const data = event.data;
 
-        this.framesPerBeat = Math.ceil((60 / this.beatsPerMinute) * sampleRate);
-      } else if (data.type === "loop-start") {
-        this.startLoop();
-      } else if (data.type === "loop-stop") {
-        this.stopLoop();
-      } else if (data.type === "loop-clear") {
-        this.clearLoop();
-      } else if (data.type === "loop-layer-remove") {
-        this.removeLastLoopLayer();
-      } else if (data.type === "metronome-enable") {
-        this.isMetronomeEnabled = data.isMetronomeEnabled;
-      }
+    if (data.type === "recording-start") {
+      this.startRecording();
+    } else if (data.type === "recording-wait") {
+      this.waitRecording();
+    } else if (data.type === "recording-stop") {
+      this.stopRecording();
+    } else if (data.type === "recording-monitoring-mute-enable") {
+      this.isRecordingMonitoringMuted = data.isRecordingMonitoringMuted;
+    } else if (data.type === "recording-wait-enable") {
+      this.isRecordingWaitEnabled = data.isRecordingWaitEnabled;
+
+      this.isRecordingSilence = this.isRecordingWaitEnabled ? true : false;
+    } else if (data.type === "recording-silence-level-change") {
+      this.recordingSilenceLevel = data.recordingSilenceLevel;
+    } else if (data.type === "loop-gain-change") {
+      this.loopGain = data.loopGain;
+    } else if (data.type === "loop-bpm-change") {
+      this.loopBeatsPerMinute = Math.max(30, Math.min(300, data.loopBeatsPerMinute));
+
+      this.framesPerBeat = Math.ceil((60 / this.loopBeatsPerMinute) * sampleRate);
+    } else if (data.type === "loop-start") {
+      this.startLoop();
+    } else if (data.type === "loop-stop") {
+      this.stopLoop();
+    } else if (data.type === "loop-clear") {
+      this.clearLoop();
+    } else if (data.type === "loop-layer-remove") {
+      this.removeLoopLayer();
+    } else if (data.type === "metronome-enable") {
+      this.isMetronomeEnabled = data.isMetronomeEnabled;
     }
   }
 
@@ -220,7 +224,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.port.postMessage({ type: "loop-beat-update", loopBeat: this.currentBeat });
   }
 
-  removeLastLoopLayer() {
+  removeLoopLayer() {
     this.loopLayers.pop();
 
     this.port.postMessage({
@@ -241,6 +245,110 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.port.postMessage({ type: "metronome-click" });
   }
 
+  processRecording(input, isInputMono, frameBufferSize) {
+    for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+      for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+        const channel = isInputMono ? input[0] : input[channelIndex];
+
+        const recordingSampleIndex = this.loopLayers.length === 0
+          ? sampleIndex + this.currentRecordingFrame
+          : sampleIndex + this.currentLoopFrame;
+
+        this.recordingData[channelIndex][recordingSampleIndex] = channel[sampleIndex] * this.loopGain;
+      }
+    }
+
+    if (this.loopLayers.length === 0) {
+      this.currentRecordingFrame += frameBufferSize;
+    }
+  }
+
+  processRecordingMonitoring(input, output, isInputMono) {
+    for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+      const channel = isInputMono ? input[0] : input[channelIndex];
+
+      output[channelIndex].set(channel);
+    }
+  }
+
+  processRecordingWait(input, isInputMono, frameBufferSize) {
+    let recordingInputLoudness = 0;
+
+    for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+      const channel = isInputMono ? input[0] : input[channelIndex];
+
+      let recordingSampleSquareSum = 0;
+
+      for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+        const recordingSample = channel[sampleIndex];
+
+        recordingSampleSquareSum += recordingSample * recordingSample;
+      }
+
+      recordingInputLoudness += recordingSampleSquareSum;
+    }
+
+    recordingInputLoudness = Math.sqrt(recordingInputLoudness / (this.channelCount * frameBufferSize));
+
+    if (recordingInputLoudness > this.recordingSilenceLevel) {         
+      this.isRecordingSilence = false;
+
+      if (!this.isPlaying) {
+        if (this.isMetronomeEnabled) {
+          const lastBeatFrame = Math.floor(this.currentMetronomeBeat * this.framesPerBeat);
+          const deviationFrames = this.currentMetronomeFrame - lastBeatFrame;
+
+          if (deviationFrames > this.metronomeDeviationToleranceFrames) {
+            this.currentMetronomeFrame = 0;
+            this.currentMetronomeBeat = 0;
+
+            this.notifyMetronomeClick();
+          }
+        }
+
+        this.port.postMessage({ type: "recording-start" });
+
+        if (this.loopLayers.length === 0) {
+          this.port.postMessage({ type: "loop-beat-update", loopBeat: this.currentBeat + 1 });
+        } else {
+          this.startLoop();
+        }
+      }
+    }
+  }
+
+  processLoop(output, frameBufferSize) {
+    for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+      const loopSampleIndex = sampleIndex + this.currentLoopFrame;
+
+      for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+        let mixedLoopSample = 0;
+
+        for (const loopLayer of this.loopLayers) {
+          mixedLoopSample += loopLayer[channelIndex][loopSampleIndex];
+        }
+
+        const absoluteMixedLoopSample = Math.abs(mixedLoopSample);
+          
+        let loopSample = 0;
+
+        if (absoluteMixedLoopSample <= this.compressionThreshold) {
+          loopSample = mixedLoopSample;
+        } else {
+          const scaledLoopSample = (absoluteMixedLoopSample - this.compressionThreshold) / (1 - this.compressionThreshold);
+          const clippedLoopSample = Math.tanh(scaledLoopSample);
+          const compressedLoopSample = this.compressionThreshold + clippedLoopSample * (1 - this.compressionThreshold);
+
+          loopSample = Math.sign(mixedLoopSample) * Math.min(compressedLoopSample, this.compressionLimit);
+        }
+
+        output[channelIndex][sampleIndex] = loopSample;
+      }
+    }
+
+    this.currentLoopFrame += frameBufferSize;
+  }
+
   process(inputs, outputs) {
     const recordingInput = inputs[0];
     const recordingOutput = outputs[0];
@@ -253,11 +361,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     const isInputMono = channelCount === 1;
 
     if (this.isRecording && !this.isRecordingMonitoringMuted) {
-      for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-        const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
-
-        recordingOutput[channelIndex].set(channel);
-      }
+      this.processRecordingMonitoring(recordingInput, recordingOutput, isInputMono);
     }
 
     if (this.isRecording) {
@@ -274,100 +378,16 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       }
 
       if (this.isRecordingSilence) {
-        let recordingInputLoudness = 0;
-
-        for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-          const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
-
-          let recordingSampleSquareSum = 0;
-
-          for (let sampleIndex = 0; sampleIndex < channel.length; sampleIndex++) {
-            const recordingSample = channel[sampleIndex];
-
-            recordingSampleSquareSum += recordingSample * recordingSample;
-          }
-
-          recordingInputLoudness += recordingSampleSquareSum;
-        }
-
-        recordingInputLoudness = Math.sqrt(recordingInputLoudness / (this.channelCount * frameBufferSize));
-
-        if (recordingInputLoudness > this.recordingSilenceLevel) {         
-          this.isRecordingSilence = false;
-
-          if (!this.isPlaying) {
-            if (this.isMetronomeEnabled) {
-              const lastBeatFrame = Math.floor(this.currentMetronomeBeat * this.framesPerBeat);
-              const deviationFrames = this.currentMetronomeFrame - lastBeatFrame;
-
-              if (deviationFrames > this.metronomeDeviationToleranceFrames) {
-                this.currentMetronomeFrame = 0;
-                this.currentMetronomeBeat = 0;
-
-                this.notifyMetronomeClick();
-              }
-            }
-
-            this.port.postMessage({ type: "recording-start" });
-
-            if (this.loopLayers.length === 0) {
-              this.port.postMessage({ type: "loop-beat-update", loopBeat: this.currentBeat + 1 });
-            } else {
-              this.startLoop();
-            }
-          }
-        }
+        this.processRecordingWait(recordingInput, isInputMono, frameBufferSize);
       }
 
       if (!this.isRecordingSilence) {
-        for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
-          for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-            const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
-
-            const recordingSampleIndex = this.loopLayers.length === 0
-              ? sampleIndex + this.currentRecordingFrame
-              : sampleIndex + this.currentLoopFrame;
-
-            this.recordingData[channelIndex][recordingSampleIndex] = channel[sampleIndex] * this.loopGain;
-          }
-        }
-
-        if (this.loopLayers.length === 0) {
-          this.currentRecordingFrame += frameBufferSize;
-        }
+        this.processRecording(recordingInput, isInputMono, frameBufferSize);
       }
     }
 
     if (this.isPlaying) {
-      for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
-        const loopSampleIndex = sampleIndex + this.currentLoopFrame;
-
-        for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-          let mixedLoopSample = 0;
-
-          for (const loopLayer of this.loopLayers) {
-            mixedLoopSample += loopLayer[channelIndex][loopSampleIndex];
-          }
-
-          const absoluteMixedLoopSample = Math.abs(mixedLoopSample);
-          
-          let loopSample = 0;
-
-          if (absoluteMixedLoopSample <= this.compressionThreshold) {
-            loopSample = mixedLoopSample;
-          } else {
-            const scaledLoopSample = (absoluteMixedLoopSample - this.compressionThreshold) / (1 - this.compressionThreshold);
-            const clippedLoopSample = Math.tanh(scaledLoopSample);
-            const compressedLoopSample = this.compressionThreshold + clippedLoopSample * (1 - this.compressionThreshold);
-
-            loopSample = Math.sign(mixedLoopSample) * Math.min(compressedLoopSample, this.compressionLimit);
-          }
-
-          loopOutput[channelIndex][sampleIndex] = loopSample;
-        }
-      }
-
-      this.currentLoopFrame += frameBufferSize;
+      this.processLoop(loopOutput, frameBufferSize);
     }
 
     if (this.isRecording || this.isPlaying) {
