@@ -10,7 +10,7 @@ const messages = {
       recording: "Grabando",
       waiting: "Esperando",
       playing: "Reproduciendo",
-      rsl: "NSG",
+      rsl: "NSG (dB)",
       bpm: "PPM"
     }
   },
@@ -19,7 +19,7 @@ const messages = {
       recording: "Recording",
       waiting: "Waiting",
       playing: "Playing",
-      rsl: "RSL",
+      rsl: "RSL (dB)",
       bpm: "BPM"
     }
   }
@@ -37,8 +37,9 @@ export function AudioLooper() {
 
   const defaultSampleRate = 48000;
   const defaultRecordingDuration = 300;
-  const defaultRecordingGain = 0.8;
-  const defaultRecordingSilenceLevel = 0.05;
+  const defaultRecordingGain = Math.pow(10, -4 / 20); // -4 dBFS
+  const defaultRecordingMonitoringGain = 0.8;
+  const defaultRecordingSilenceLevel = -32 // dBFS;
   const defaultBeatsPerMinute = 120;
   const defaultMetronomeGain = 0.8;
 
@@ -47,7 +48,8 @@ export function AudioLooper() {
   const [isRecordingWaiting, setIsRecordingWaiting] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const [isRecordingMuted, setIsRecordingMuted] = useState(true);
+  const [recordingGain, setRecordingGain] = useState(defaultRecordingGain);
+  const [isRecordingMonitoringMuted, setIsRecordingMonitoringMuted] = useState(true);
   const [isRecordingWaitEnabled, setIsRecordingWaitEnabled] = useState(true);
   const [recordingSilenceLevel, setRecordingSilenceLevel] = useState(defaultRecordingSilenceLevel);
 
@@ -95,9 +97,10 @@ export function AudioLooper() {
         outputChannelCount: [channelCount, channelCount],
         processorOptions: {
           recordingDuration: defaultRecordingDuration,
-          isRecordingMuted,
+          recordingGain,
+          isRecordingMonitoringMuted,
           isRecordingWaitEnabled,
-          recordingSilenceLevel: defaultRecordingSilenceLevel,
+          recordingSilenceLevel: Math.pow(10, defaultRecordingSilenceLevel / 20),
           beatsPerMinute,
           isMetronomeEnabled
         }
@@ -144,7 +147,7 @@ export function AudioLooper() {
 
     inputGainNodeRef.current = new GainNode(audioContextRef.current, {
       channelCount,
-      gain: defaultRecordingGain
+      gain: defaultRecordingMonitoringGain
     });
 
     metronomeGainNodeRef.current = new GainNode(audioContextRef.current, {
@@ -201,16 +204,27 @@ export function AudioLooper() {
     looperWorkletNodeRef.current.port.postMessage({ type: "recording-stop" });
   }
 
-  function toggleRecordingMute() {
+  function changeRecordingGain(event) {
+    const recordingGain = event.target.value;
+
     looperWorkletNodeRef.current.port.postMessage({
-      type: "recording-mute",
-      isRecordingMuted: !isRecordingMuted
+      type: "recording-gain-change",
+      recordingGain
     });
 
-    setIsRecordingMuted(!isRecordingMuted);
+    setRecordingGain(recordingGain);
   }
 
-  function changeRecordingGain(event) {
+  function toggleRecordingMonitoringMute() {
+    looperWorkletNodeRef.current.port.postMessage({
+      type: "recording-monitoring-mute",
+      isRecordingMonitoringMuted: !isRecordingMonitoringMuted
+    });
+
+    setIsRecordingMonitoringMuted(!isRecordingMonitoringMuted);
+  }
+
+  function changeRecordingMonitoringGain(event) {
     const gain = event.target.value;
 
     inputGainNodeRef.current.gain.setValueAtTime(gain, audioContextRef.current.currentTime);
@@ -230,7 +244,7 @@ export function AudioLooper() {
 
     looperWorkletNodeRef.current.port.postMessage({
       type: "recording-silence-level-change",
-      recordingSilenceLevel
+      recordingSilenceLevel: Math.pow(10, recordingSilenceLevel / 20)
     });
 
     setRecordingSilenceLevel(recordingSilenceLevel);
@@ -429,8 +443,17 @@ export function AudioLooper() {
               : !isRecording ? <>&#x25cb;</> : <>&#x25cf;</>
             }
           </button>
-          <button disabled={!isRecordingAllowed} onClick={toggleRecordingMute}>
-            {isRecordingMuted ? <b>M</b> : "M" }
+          <input
+            type="range"
+            disabled={!isRecordingAllowed || isRecording || isRecordingWaiting}
+            min={0.1}
+            max={1}
+            step={0.01}
+            defaultValue={defaultRecordingGain}
+            onChange={changeRecordingGain}
+          />
+          <button disabled={!isRecordingAllowed} onClick={toggleRecordingMonitoringMute}>
+            {isRecordingMonitoringMuted ? <b>M</b> : "M" }
           </button>
           <input
             type="range"
@@ -438,8 +461,8 @@ export function AudioLooper() {
             min={0}
             max={1}
             step={0.05}
-            defaultValue={defaultRecordingGain}
-            onChange={changeRecordingGain}
+            defaultValue={defaultRecordingMonitoringGain}
+            onChange={changeRecordingMonitoringGain}
           />
           <button
             disabled={!isRecordingAllowed || isRecording}
@@ -452,9 +475,9 @@ export function AudioLooper() {
             <input
               type="number"
               disabled={!isRecordingAllowed || isRecording}
-              min={0}
-              max={0.5}
-              step={0.001}
+              min={-40}
+              max={-6}
+              step={1}
               value={recordingSilenceLevel}
               onChange={changeRecordingSilenceLevel}
               onKeyDown={(event) => event.preventDefault()}

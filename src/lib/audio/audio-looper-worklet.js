@@ -7,7 +7,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.channelCount = options.outputChannelCount[0];
 
     this.recordingDuration = processorOptions.recordingDuration;
-    this.isRecordingMuted = processorOptions.isRecordingMuted;
+    this.recordingGain = processorOptions.recordingGain;
+    this.isRecordingMonitoringMuted = processorOptions.isRecordingMonitoringMuted;
     this.isRecordingWaitEnabled = processorOptions.isRecordingWaitEnabled ?? false;
     this.recordingSilenceLevel = processorOptions.recordingSilenceLevel;
     this.beatsPerMinute = processorOptions.beatsPerMinute;
@@ -43,8 +44,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         this.waitRecording();
       } else if (data.type === "recording-stop") {
         this.stopRecording();
-      } else if (data.type === "recording-mute") {
-        this.isRecordingMuted = data.isRecordingMuted;
+      } else if (data.type === "recording-gain-change") {
+        this.recordingGain = data.recordingGain;
+      } else if (data.type === "recording-monitoring-mute") {
+        this.isRecordingMonitoringMuted = data.isRecordingMonitoringMuted;
       } else if (data.type === "recording-wait-enable") {
         this.isRecordingWaitEnabled = data.isRecordingWaitEnabled;
 
@@ -146,7 +149,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
           recordedData[channelIndex] = this.recordingData[channelIndex].slice(0, this.recordingFrameCount);
         }
 
-        this.loopLayers.push(recordedData);
+        this.loopLayers.push({ gain: this.recordingGain, data: recordedData });
 
         this.loopFrameCount = this.recordingFrameCount;
 
@@ -163,7 +166,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: "loop-start" });
         this.port.postMessage({ type: "loop-beat-update", loopBeat: 1 });
       } else {
-        this.loopLayers.push(this.recordingData);
+        this.loopLayers.push({ gain: this.recordingGain, data: this.recordingData });
 
         this.recordingData = new Array(this.channelCount)
           .fill(new Float32Array(this.loopFrameCount));
@@ -246,7 +249,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
     const isInputMono = channelCount === 1;
 
-    if (this.isRecording && !this.isRecordingMuted) {
+    if (this.isRecording && !this.isRecordingMonitoringMuted) {
       for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
         const channel = isInputMono ? recordingInput[0] : recordingInput[channelIndex];
 
@@ -284,7 +287,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
         recordingInputLoudness = Math.sqrt(recordingInputLoudness / (this.channelCount * frameBufferSize));
 
-        if (recordingInputLoudness > this.recordingSilenceLevel) {
+        if (recordingInputLoudness * this.recordingGain > this.recordingSilenceLevel) {
           this.isRecordingSilence = false;
 
           if (!this.isPlaying) {
@@ -336,7 +339,9 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
         for (const loopLayer of this.loopLayers) {
           for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-            loopOutput[channelIndex][sampleIndex] += loopLayer[channelIndex][loopSampleIndex];
+            const loopSample = loopLayer.data[channelIndex][loopSampleIndex];
+
+            loopOutput[channelIndex][sampleIndex] += loopSample * loopLayer.gain;
           }
         }
       }
@@ -384,7 +389,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       if (this.currentLoopFrame === this.loopFrameCount) {
         if (this.isRecording) {
           if (!this.isRecordingSilence) {
-            this.loopLayers.push(this.recordingData);
+            this.loopLayers.push({ gain: this.recordingGain, data: this.recordingData });
 
             this.recordingData = new Array(this.channelCount)
               .fill(new Float32Array(this.loopFrameCount));
