@@ -37,6 +37,9 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.currentLoopFrame = 0;
     this.loopLayers = [];
 
+    this.compressionThreshold = Math.pow(10, -2 / 20); // -2 dBFS
+    this.compressionLimit = 0.95;
+
     this.port.onmessage = ({ data }) => {
       if (data.type === "recording-start") {
         this.startRecording();
@@ -337,12 +340,28 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
         const loopSampleIndex = sampleIndex + this.currentLoopFrame;
 
-        for (const loopLayer of this.loopLayers) {
-          for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-            const loopSample = loopLayer.data[channelIndex][loopSampleIndex];
+        for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+          let mixedLoopSample = 0;
 
-            loopOutput[channelIndex][sampleIndex] += loopSample * loopLayer.gain;
+          for (const loopLayer of this.loopLayers) {
+            mixedLoopSample += loopLayer.data[channelIndex][loopSampleIndex] * loopLayer.gain;
           }
+
+          const absoluteMixedLoopSample = Math.abs(mixedLoopSample);
+          
+          let loopSample = 0;
+
+          if (absoluteMixedLoopSample <= this.compressionThreshold) {
+            loopSample = mixedLoopSample;
+          } else {
+            const scaledLoopSample = (absoluteMixedLoopSample - this.compressionThreshold) / (1 - this.compressionThreshold);
+            const clippedLoopSample = Math.tanh(scaledLoopSample);
+            const compressedLoopSample = this.compressionThreshold + clippedLoopSample * (1 - this.compressionThreshold);
+
+            loopSample = Math.sign(mixedLoopSample) * Math.min(compressedLoopSample, this.compressionLimit);
+          }
+
+          loopOutput[channelIndex][sampleIndex] = loopSample;
         }
       }
 
