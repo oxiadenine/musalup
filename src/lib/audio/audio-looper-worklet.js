@@ -7,10 +7,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.channelCount = options.outputChannelCount[0];
 
     this.recordingDuration = processorOptions.recordingDuration;
-    this.recordingGain = processorOptions.recordingGain;
     this.isRecordingMonitoringMuted = processorOptions.isRecordingMonitoringMuted;
     this.isRecordingWaitEnabled = processorOptions.isRecordingWaitEnabled ?? false;
     this.recordingSilenceLevel = processorOptions.recordingSilenceLevel;
+    this.loopGain = processorOptions.loopGain;
     this.beatsPerMinute = processorOptions.beatsPerMinute;
     this.isMetronomeEnabled = processorOptions.isMetronomeEnabled ?? false;
 
@@ -47,8 +47,6 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         this.waitRecording();
       } else if (data.type === "recording-stop") {
         this.stopRecording();
-      } else if (data.type === "recording-gain-change") {
-        this.recordingGain = data.recordingGain;
       } else if (data.type === "recording-monitoring-mute") {
         this.isRecordingMonitoringMuted = data.isRecordingMonitoringMuted;
       } else if (data.type === "recording-wait-enable") {
@@ -57,6 +55,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         this.isRecordingSilence = this.isRecordingWaitEnabled ? true : false;
       } else if (data.type === "recording-silence-level-change") {
         this.recordingSilenceLevel = data.recordingSilenceLevel;
+      } else if (data.type === "loop-gain-change") {
+        this.loopGain = data.loopGain;
       } else if (data.type === "loop-bpm-change") {
         this.beatsPerMinute = Math.max(30, Math.min(300, data.beatsPerMinute));
 
@@ -152,7 +152,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
           recordedData[channelIndex] = this.recordingData[channelIndex].slice(0, this.recordingFrameCount);
         }
 
-        this.loopLayers.push({ gain: this.recordingGain, data: recordedData });
+        this.loopLayers.push(recordedData);
 
         this.loopFrameCount = this.recordingFrameCount;
 
@@ -169,7 +169,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: "loop-start" });
         this.port.postMessage({ type: "loop-beat-update", loopBeat: 1 });
       } else {
-        this.loopLayers.push({ gain: this.recordingGain, data: this.recordingData });
+        this.loopLayers.push(this.recordingData);
 
         this.recordingData = new Array(this.channelCount)
           .fill(new Float32Array(this.loopFrameCount));
@@ -282,7 +282,9 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
           let recordingSampleSquareSum = 0;
 
           for (let sampleIndex = 0; sampleIndex < channel.length; sampleIndex++) {
-            recordingSampleSquareSum += channel[sampleIndex] * channel[sampleIndex];
+            const recordingSample = channel[sampleIndex];
+
+            recordingSampleSquareSum += recordingSample * recordingSample;
           }
 
           recordingInputLoudness += recordingSampleSquareSum;
@@ -290,7 +292,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
         recordingInputLoudness = Math.sqrt(recordingInputLoudness / (this.channelCount * frameBufferSize));
 
-        if (recordingInputLoudness * this.recordingGain > this.recordingSilenceLevel) {
+        if (recordingInputLoudness > this.recordingSilenceLevel) {         
           this.isRecordingSilence = false;
 
           if (!this.isPlaying) {
@@ -326,7 +328,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
               ? sampleIndex + this.currentRecordingFrame
               : sampleIndex + this.currentLoopFrame;
 
-            this.recordingData[channelIndex][recordingSampleIndex] = channel[sampleIndex];
+            this.recordingData[channelIndex][recordingSampleIndex] = channel[sampleIndex] * this.loopGain;
           }
         }
 
@@ -344,7 +346,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
           let mixedLoopSample = 0;
 
           for (const loopLayer of this.loopLayers) {
-            mixedLoopSample += loopLayer.data[channelIndex][loopSampleIndex] * loopLayer.gain;
+            mixedLoopSample += loopLayer[channelIndex][loopSampleIndex];
           }
 
           const absoluteMixedLoopSample = Math.abs(mixedLoopSample);
@@ -408,7 +410,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       if (this.currentLoopFrame === this.loopFrameCount) {
         if (this.isRecording) {
           if (!this.isRecordingSilence) {
-            this.loopLayers.push({ gain: this.recordingGain, data: this.recordingData });
+            this.loopLayers.push(this.recordingData);
 
             this.recordingData = new Array(this.channelCount)
               .fill(new Float32Array(this.loopFrameCount));
