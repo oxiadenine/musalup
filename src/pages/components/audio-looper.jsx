@@ -339,7 +339,7 @@ export function AudioLooper() {
       }
     }
 
-    if (isRecording || isRecordingWaiting || loopDuration === 0) {
+    if (isRecording || isRecordingWaiting || loopLayerCount === 0) {
       return;
     }
     
@@ -376,7 +376,6 @@ export function AudioLooper() {
     isRecording,
     isRecordingWaiting,
     isPlaying,
-    loopDuration,
     loopLayerCount
   ]);
 
@@ -401,7 +400,7 @@ export function AudioLooper() {
         </h5>
       </div>
       <div>
-        {loopDuration > 0 && (
+        {loopLayerCount > 0 && (
           <button
             disabled={!isRecordingAllowed || isRecording || isRecordingWaiting}
             onClick={!isPlaying ? startLoop : stopLoop}
@@ -410,8 +409,24 @@ export function AudioLooper() {
           </button>
         )}
         <progress max={loopDuration} value={loopTime} />
-        {isRecording && loopDuration === 0 && <h5>{loopBeat}</h5>}
-        {loopDuration > 0 && <h5>{`${loopBeat}/${loopBeatCount} (${loopLayerCount})`}</h5>}
+        {isRecording && loopLayerCount === 0 && <h5>{loopBeat}</h5>}
+        {loopLayerCount > 0 && <h5>{`${loopBeat}/${loopBeatCount} (${loopLayerCount})`}</h5>}
+        {loopLayerCount > 0 && (
+          <div>
+            <button
+              disabled={!isRecordingAllowed || isRecording || isPlaying || loopLayerCount <= 1}
+              onClick={removeLastLoopLayer}
+            >
+              &#x2baa;
+            </button>
+            <button
+              disabled={!isRecordingAllowed || isRecording || isPlaying}
+              onClick={clearLoop}
+            >
+              &#x267b;
+            </button>
+          </div>
+        )}
       </div>
       <div>
         <div>
@@ -424,18 +439,18 @@ export function AudioLooper() {
             defaultValue={defaultLoopGain}
             onChange={changeLoopGain}
           />
-          <button
-            disabled={!isRecordingAllowed || isRecording || isPlaying || loopLayerCount === 0}
-            onClick={clearLoop}
-          >
-            &#x267b;
-          </button>
-          <button
-            disabled={!isRecordingAllowed || isRecording || isPlaying || loopLayerCount < 2}
-            onClick={removeLastLoopLayer}
-          >
-            &#x2baa;
-          </button>
+          <div>
+            <h5>{translate("audio-looper:text.bpm")}</h5>
+            <input
+              type="number"
+              disabled={!isRecordingAllowed || isRecording || loopLayerCount > 0}
+              min={30}
+              max={300}
+              value={beatsPerMinute}
+              onChange={changeBeatsPerMinute}
+              onKeyDown={(event) => event.preventDefault()}
+            />
+          </div>
         </div>
         <div>
           <button
@@ -483,18 +498,6 @@ export function AudioLooper() {
           </div>
         </div>
         <div>
-          <div>
-            <h5>{translate("audio-looper:text.bpm")}</h5>
-            <input
-              type="number"
-              disabled={!isRecordingAllowed || isRecording || loopDuration > 0}
-              min={30}
-              max={300}
-              value={beatsPerMinute}
-              onChange={changeBeatsPerMinute}
-              onKeyDown={(event) => event.preventDefault()}
-            />
-          </div>
           <button
             disabled={!isRecordingAllowed}
             onClick={toggleMetronomeEnable}
