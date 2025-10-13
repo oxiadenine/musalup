@@ -14,18 +14,9 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.loopGain = processorOptions.loopGain;
     this.loopBeatsPerMinute = processorOptions.loopBeatsPerMinute;
     this.isMetronomeEnabled = processorOptions.isMetronomeEnabled ?? false;
+    this.metronomeGain = processorOptions.metronomeGain;
 
     this.isRecordingSilence = this.isRecordingWaitEnabled ? true : false;
-
-    this.framesPerBeat = Math.ceil(60 / this.loopBeatsPerMinute * sampleRate);
-    this.framesPerSubBeat = sampleRate / 30;
-
-    this.currentBeat = 0;
-    this.currentSubBeat = 0;
-
-    this.currentMetronomeFrame = 0;
-    this.currentMetronomeBeat = 0;
-    this.metronomeDeviationToleranceFrames = Math.ceil(0.15 * sampleRate);
 
     this.isRecording = false;
     this.isPlaying = false;
@@ -40,6 +31,20 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
     this.compressionThreshold = Math.pow(10, -2 / 20); // -2 dBFS
     this.compressionLimit = 0.95;
+
+    this.framesPerBeat = Math.ceil(60 / this.loopBeatsPerMinute * sampleRate);
+    this.framesPerSubBeat = sampleRate / 30;
+
+    this.currentBeat = 0;
+    this.currentSubBeat = 0;
+
+    this.currentMetronomeFrame = 0;
+    this.currentMetronomeBeat = 0;
+    this.metronomeDeviationToleranceFrames = Math.ceil(0.15 * sampleRate);
+    this.metronomeClickSampleCount = Math.ceil(0.1 * sampleRate);
+    this.currentMetronomeClickSample = 0;
+    this.metronomeClickSamples = this.createMetronomeClick();
+    this.isMetronomeClickActive = false;
 
     this.port.onmessage = this.handleMessage.bind(this);
   }
@@ -79,6 +84,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       this.removeLoopLayer();
     } else if (data.type === "metronome-enable") {
       this.isMetronomeEnabled = data.isMetronomeEnabled;
+    } else if (data.type === "metronome-gain-change") {
+      this.metronomeGain = data.metronomeGain;
     }
   }
 
@@ -86,9 +93,9 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.isRecording = true;
 
     if (this.isMetronomeEnabled) {
-      this.port.postMessage({ type: "metronome-click"});
+      this.isMetronomeClickActive = true;
     }
-        
+   
     if (this.loopLayers.length === 0) {
       this.recordingFrameCount = Math.ceil(this.recordingDuration * sampleRate);
 
@@ -119,7 +126,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.isRecordingSilence = true;
 
     if (this.isMetronomeEnabled) {
-      this.port.postMessage({ type: "metronome-click"});
+      this.isMetronomeClickActive = true;
     }
         
     if (this.loopLayers.length === 0) {
@@ -145,6 +152,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     if (this.isMetronomeEnabled) {
       this.currentMetronomeFrame = 0;
       this.currentMetronomeBeat = 0;
+      this.currentMetronomeClickSample = 0;
+      this.isMetronomeClickActive = false;
     }
 
     if (!this.isRecordingSilence) {
@@ -244,8 +253,33 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.port.postMessage({ type: "loop-time-update", loopTime: this.currentLoopFrame });
   }
 
-  notifyMetronomeClick() {
-    this.port.postMessage({ type: "metronome-click" });
+  createMetronomeClick() {
+    const samples = new Float32Array(this.metronomeClickSampleCount);
+
+    const frequency = 1000;
+    const amplitude = 1;
+    const attackTime = 0.002; // 2ms
+    const sustainTime = 0.02;
+    const decayRate = 60;
+    
+    for (let sampleIndex = 0; sampleIndex < this.metronomeClickSampleCount; sampleIndex++) {
+      const time = sampleIndex / sampleRate;
+
+      let envelope = 0;
+
+      if (time < attackTime) {
+        envelope = (time / attackTime);
+        envelope *= envelope;
+      } else if (time < attackTime + sustainTime) {
+        envelope = 1;
+      } else {
+        envelope = Math.exp(-(time - attackTime - sustainTime) * decayRate);
+      }
+
+      samples[sampleIndex] = amplitude * envelope * Math.sin(2 * Math.PI * frequency * time);
+    }
+    
+    return samples;
   }
 
   processRecording(input, isInputMono, frameBufferSize) {
@@ -306,8 +340,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
           if (deviationFrames > this.metronomeDeviationToleranceFrames) {
             this.currentMetronomeFrame = 0;
             this.currentMetronomeBeat = 0;
-
-            this.notifyMetronomeClick();
+            this.currentMetronomeClickSample = 0;
+            this.isMetronomeClickActive = true;
           }
         }
 
@@ -354,11 +388,31 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.currentLoopFrame += frameBufferSize;
   }
 
+  processMetronomeClick(output, frameBufferSize) {
+    for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+      const metronomeClickSampleIndex = sampleIndex + this.currentMetronomeClickSample;
+
+      for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
+        const metronomeClickSample = this.metronomeClickSamples[metronomeClickSampleIndex];
+
+        output[channelIndex][sampleIndex] = metronomeClickSample * this.metronomeGain;
+      }
+    }
+
+    this.currentMetronomeClickSample += frameBufferSize;
+
+    if (this.currentMetronomeClickSample >= this.metronomeClickSampleCount) {
+      this.currentMetronomeClickSample = 0;
+      this.isMetronomeClickActive = false;
+    }
+  }
+
   process(inputs, outputs) {
     const recordingInput = inputs[0];
-    const recordingOutput = outputs[0];
 
+    const recordingOutput = outputs[0];
     const loopOutput = outputs[1];
+    const metronomeOutput = outputs[2];
 
     const channelCount = Math.min(recordingInput.length, this.channelCount);
     const frameBufferSize = recordingOutput[0].length;
@@ -370,6 +424,14 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     }
 
     if (this.isRecording) {
+      if (this.isRecordingSilence) {
+        this.processRecordingWait(recordingInput, isInputMono, frameBufferSize);
+      }
+
+      if (!this.isRecordingSilence) {
+        this.processRecording(recordingInput, isInputMono, frameBufferSize);
+      }
+
       if (this.isMetronomeEnabled) {
         this.currentMetronomeFrame += frameBufferSize;
 
@@ -377,17 +439,12 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
         if (currentBeat !== this.currentMetronomeBeat) {
           this.currentMetronomeBeat = currentBeat;
-
-          this.notifyMetronomeClick();
+          this.isMetronomeClickActive = true;
         }
-      }
 
-      if (this.isRecordingSilence) {
-        this.processRecordingWait(recordingInput, isInputMono, frameBufferSize);
-      }
-
-      if (!this.isRecordingSilence) {
-        this.processRecording(recordingInput, isInputMono, frameBufferSize);
+        if (this.isMetronomeClickActive) {
+          this.processMetronomeClick(metronomeOutput, frameBufferSize);
+        }
       }
     }
 

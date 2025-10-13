@@ -32,7 +32,6 @@ export function AudioLooper() {
   const audioContextRef = useRef(undefined);
   const inputStreamSourceNodeRef = useRef(undefined);
   const looperWorkletNodeRef = useRef(undefined);
-  const metronomeGainNodeRef = useRef(undefined);
 
   const defaultSampleRate = 48000;
   const defaultRecordingDuration = 300;
@@ -62,6 +61,7 @@ export function AudioLooper() {
   const [loopBeat, setLoopBeat] = useState(0);
 
   const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(true);
+  const [metronomeGain, setMetronomeGain] = useState(defaultMetronomeGain);
 
   const handleKeyEventRef = useRef(handleKeyEvent);
 
@@ -94,8 +94,8 @@ export function AudioLooper() {
       audioContextRef.current,
       "looper-worklet",
       {
-        numberOfOutputs: [2],
-        outputChannelCount: [channelCount, channelCount],
+        numberOfOutputs: [3],
+        outputChannelCount: [channelCount, channelCount, channelCount],
         processorOptions: {
           recordingDuration: defaultRecordingDuration,
           isRecordingMonitoringMuted,
@@ -104,7 +104,8 @@ export function AudioLooper() {
           recordingSilenceLevel: Math.pow(10, defaultRecordingSilenceLevel / 20),
           loopGain,
           loopBeatsPerMinute,
-          isMetronomeEnabled
+          isMetronomeEnabled,
+          metronomeGain
         }
       }
     );
@@ -142,20 +143,13 @@ export function AudioLooper() {
         setLoopBeat(data.loopBeat);
       } else if (data.type === "loop-time-update") {
         setLoopTime(data.loopTime);
-      } else if (data.type === "metronome-click") {
-        playMetronomeClick();
       }
     };
-
-    metronomeGainNodeRef.current = new GainNode(audioContextRef.current, {
-      channelCount,
-      gain: defaultMetronomeGain
-    });
 
     inputStreamSourceNodeRef.current.connect(looperWorkletNodeRef.current);
     looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 0, 0);
     looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 1, 0);
-    metronomeGainNodeRef.current.connect(audioContextRef.current.destination);
+    looperWorkletNodeRef.current.connect(audioContextRef.current.destination, 2, 0);
 
     setIsRecordingAllowed(true);
   }
@@ -173,10 +167,6 @@ export function AudioLooper() {
 
     if (looperWorkletNodeRef.current) {
       looperWorkletNodeRef.current.disconnect();
-    }
-
-    if (metronomeGainNodeRef.current) {
-      metronomeGainNodeRef.current.disconnect();
     }
     
     if (audioContextRef.current) {
@@ -284,33 +274,14 @@ export function AudioLooper() {
   }
 
   function changeMetronomeGain(event) {
-    const gain = event.target.value;
+    const metronomeGain = event.target.value;
 
-    metronomeGainNodeRef.current.gain.setValueAtTime(gain, audioContextRef.current.currentTime);
-  }
+    looperWorkletNodeRef.current.port.postMessage({
+      type: "metronome-gain-change",
+      metronomeGain
+    });
 
-  function playMetronomeClick() {
-    const gainNode = new GainNode(audioContextRef.current);
-    const oscillatorNode = new OscillatorNode(audioContextRef.current, { frequency: 1000 });
-      
-    oscillatorNode.connect(gainNode);
-    gainNode.connect(metronomeGainNodeRef.current);
-      
-    const currentTime = audioContextRef.current.currentTime;
-  
-    const attackTime = 0.005;
-    const decayTime = 0.025;
-    const sustainLevel = 0.75;
-    const releaseTime = 0.05;
-  
-    const clickDuration = attackTime + decayTime + releaseTime;
-  
-    gainNode.gain.exponentialRampToValueAtTime(1, currentTime + attackTime);
-    gainNode.gain.exponentialRampToValueAtTime(sustainLevel, currentTime + attackTime + decayTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + attackTime + decayTime + releaseTime);
-  
-    oscillatorNode.start(currentTime);
-    oscillatorNode.stop(currentTime + clickDuration);
+    setMetronomeGain(metronomeGain);
   }
 
   function handleKeyEvent(event) {
@@ -500,7 +471,7 @@ export function AudioLooper() {
         </div>
         <div>
           <button
-            disabled={!isRecordingAllowed}
+            disabled={!isRecordingAllowed || isRecording || isRecordingWaiting}
             onClick={toggleMetronomeEnable}
           >
             {isMetronomeEnabled ? <>&#x1f50a;</> : <>&#x1f508;</>}
