@@ -19,6 +19,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     this.isRecordingSilence = this.isRecordingWaitEnabled ? true : false;
 
     this.isRecording = false;
+    this.isRecordingStopRequested = false;
     this.isPlaying = false;
 
     this.recordingFrameCount = 0;
@@ -57,7 +58,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     } else if (data.type === "recording-wait") {
       this.waitRecording();
     } else if (data.type === "recording-stop") {
-      this.stopRecording();
+      this.isRecordingStopRequested = true;
     } else if (data.type === "recording-monitoring-mute-enable") {
       this.isRecordingMonitoringMuted = data.isRecordingMonitoringMuted;
     } else if (data.type === "recording-monitoring-gain-change") {
@@ -148,6 +149,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
   stopRecording() {
     this.isRecording = false;
+    this.isRecordingStopRequested = false;
 
     if (this.isMetronomeEnabled) {
       this.currentMetronomeFrame = 0;
@@ -280,7 +282,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
   }
 
   processRecording(input, isInputMono, frameBufferSize) {
-    for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+    const remainingSamples = this.recordingFrameCount - this.currentRecordingFrame;
+    const sampleBufferSize = Math.min(remainingSamples, frameBufferSize);
+
+    for (let sampleIndex = 0; sampleIndex < sampleBufferSize; sampleIndex++) {
       for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
         const channel = isInputMono ? input[0] : input[channelIndex];
 
@@ -290,8 +295,8 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       }
     }
 
-    this.currentRecordingFrame += frameBufferSize;
-
+    this.currentRecordingFrame += sampleBufferSize;
+    
     if (this.loopLayers.length === 0) {
       const currentBeat = Math.floor(this.currentRecordingFrame / this.framesPerBeat);
 
@@ -302,7 +307,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       }
     }
 
-    if (this.currentRecordingFrame >= this.recordingFrameCount) {
+    if (this.isRecordingStopRequested || this.currentRecordingFrame >= this.recordingFrameCount) {
       if (this.loopLayers.length === 0) {
         this.stopRecording();
       } else {
@@ -497,6 +502,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
     if (this.isRecording) {
       if (this.isRecordingSilence) {
         this.processRecordingWait(recordingInput, isInputMono, frameBufferSize);
+      }
+
+      if (this.isRecordingSilence && this.isRecordingStopRequested) {
+        this.stopRecording();
       }
 
       if (!this.isRecordingSilence) {
