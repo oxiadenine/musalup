@@ -455,16 +455,21 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
 
     if (this.isMetronomeClickActive) {
       for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
-        const metronomeClickSampleIndex = sampleIndex + this.currentMetronomeClickSample;
+        if (this.currentMetronomeClickSample >= this.metronomeClickSampleCount) {
+          this.currentMetronomeClickSample = 0;
+          this.isMetronomeClickActive = false;
+
+          break;
+        }
 
         for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
-          const metronomeClickSample = this.metronomeClickSamples[metronomeClickSampleIndex];
+          const metronomeClickSample = this.metronomeClickSamples[this.currentMetronomeClickSample];
 
           output[channelIndex][sampleIndex] = metronomeClickSample * this.metronomeGain;
         }
-      }
 
-      this.currentMetronomeClickSample += frameBufferSize;
+        this.currentMetronomeClickSample++;
+      }
 
       if (this.currentMetronomeClickSample >= this.metronomeClickSampleCount) {
         this.currentMetronomeClickSample = 0;
