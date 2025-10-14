@@ -389,7 +389,10 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
   }
 
   processLoop(output, frameBufferSize) {
-    for (let sampleIndex = 0; sampleIndex < frameBufferSize; sampleIndex++) {
+    const remainingSamples = this.loopFrameCount - this.currentLoopFrame;
+    const sampleBufferSize = Math.min(remainingSamples, frameBufferSize);
+
+    for (let sampleIndex = 0; sampleIndex < sampleBufferSize; sampleIndex++) {
       const loopSampleIndex = sampleIndex + this.currentLoopFrame;
 
       for (let channelIndex = 0; channelIndex < this.channelCount; channelIndex++) {
@@ -417,7 +420,7 @@ class LooperWorkletProcessor extends AudioWorkletProcessor {
       }
     }
 
-    this.currentLoopFrame += frameBufferSize;
+    this.currentLoopFrame += sampleBufferSize;
 
     const currentBeat = Math.floor(this.currentLoopFrame / this.framesPerBeat);
 
