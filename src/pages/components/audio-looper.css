@@ -27,15 +27,16 @@
 }
 
 .audio-looper > div:nth-child(2) {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  grid-template-rows: 32px;
   column-gap: 16px;
-  justify-content: center;
+  justify-items: center;
   align-items: center;
-  height: 32px;
-  margin-bottom: 8px;
 }
 
 .audio-looper > div:nth-child(2) > progress {
+  grid-column: 2;
   width: 256px;
 }
 
@@ -46,24 +47,39 @@
 
 .audio-looper > div:nth-child(3) {
   display: flex;
-  column-gap: 32px;
-  justify-content: center;
-  align-items: end;
+  height: 32px;
 }
 
 .audio-looper > div:nth-child(3) > div {
+  display: grid;
+  grid-template-columns: repeat(3, 32px);
+  grid-template-rows: 32px;
+  column-gap: 8px;
+  justify-items: center;
+  align-items: center;
+}
+
+.audio-looper > div:nth-child(4) {
+  display: flex;
+  column-gap: 32px;
+  justify-content: center;
+  align-items: end;
+  margin-top: 16px;
+}
+
+.audio-looper > div:nth-child(4) > div {
   display: flex;
   align-items: end;
   column-gap: 8px;
 }
 
-.audio-looper > div:nth-child(3) > div > div {
+.audio-looper > div:nth-child(4) > div > div {
   display: flex;
   flex-direction: column;
   row-gap: 8px;
 }
 
-.audio-looper > div:nth-child(3) > div > input[type="range"] {
+.audio-looper > div:nth-child(4) > div > input[type="range"] {
   height: 42px;
   writing-mode: vertical-lr;
   direction: rtl;

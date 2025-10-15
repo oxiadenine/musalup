@@ -378,7 +378,9 @@ export function AudioLooper() {
         )}
         <progress max={loopDuration} value={loopTime} />
         {isRecording && loopLayerCount === 0 && <h5>{loopBeat}</h5>}
-        {loopLayerCount > 0 && <h5>{`${loopBeat}/${loopBeatCount} (${loopLayerCount})`}</h5>}
+        {loopLayerCount > 0 && <h5>{`${loopBeat}/${loopBeatCount}`}</h5>}
+      </div>
+      <div>
         {loopLayerCount > 0 && (
           <div>
             <button
@@ -389,6 +391,7 @@ export function AudioLooper() {
             >
               &#x2baa;
             </button>
+            <h5>{loopLayerCount}</h5>
             <button
               disabled={!isRecordingAllowed || isRecording || isRecordingWaiting || isPlaying}
               onClick={clearLoop}
