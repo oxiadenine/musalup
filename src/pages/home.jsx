@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLoaderData, Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "../lib/intl";
-import { AudioLooper } from "./components/audio-looper";
+import { createAudioLooper } from "./components/audio-looper";
 import "./home.css";
 
 const messages = {
@@ -52,6 +52,32 @@ export function Home() {
     navigate(`/${language}`, { replace: true });
   }
 
+  const audioLooperElementRef = useRef(undefined);
+  const audioLooperRef = useRef(undefined);
+
+  const languageListener = (onLanguageChange) => {
+    onLanguageChange(translation.language);
+
+    translation.on("languageChanged", onLanguageChange);
+  };
+
+  useEffect(() => {
+    if (!audioLooperRef.current) {
+      audioLooperRef.current = createAudioLooper(audioLooperElementRef.current, {
+        intl: {
+          language: translation.language,
+          languageListener
+        }
+      });
+    }
+
+    return () => {
+      if (audioLooperRef.current) {
+        audioLooperRef.current.destroy();
+      }
+    };
+  }, []);
+
   return (
     <div className="home">
       <Helmet>
@@ -81,7 +107,7 @@ export function Home() {
         </div>
       </div>
       <div>
-        <AudioLooper />
+        <div ref={audioLooperElementRef}></div>
       </div>
     </div>
   );
